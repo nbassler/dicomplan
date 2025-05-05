@@ -51,12 +51,12 @@ class Dicom:
         self.ds.DeviceSerialNumber = '123456789012'         # 0018,1000
         self.ds.SoftwareVersions = '0.0'                    # 0018,1020
 
-        self.ds.StudyInstanceUID = pydicom.uid.generate_uid()  # 0020,000d
+        self.ds.StudyInstanceUID = pydicom.uid.generate_uid()   # 0020,000d
         self.ds.SeriesInstanceUID = pydicom.uid.generate_uid()  # 0020,000e
-        self.ds.StudyID = 'Phantom1'                           # 0020,0010
-        self.ds.SeriesNumber = '1'                             # 0020,0011
-        self.ds.FrameOfReferenceUID = pydicom.uid.generate_uid()        # 0020,0052
-        self.ds.PositionReferenceIndicator = ''                # 0020,1040
+        self.ds.StudyID = 'Phantom1'                            # 0020,0010
+        self.ds.SeriesNumber = '1'                              # 0020,0011
+        self.ds.FrameOfReferenceUID = pydicom.uid.generate_uid()   # 0020,0052
+        self.ds.PositionReferenceIndicator = ''                 # 0020,1040
 
         self.ds.RTPlanLabel = 'DefaultLabel'                 # 300a,0002
         self.ds.RTPlanDate = '20250101'                      # 300a,0006
@@ -69,14 +69,15 @@ class Dicom:
         self.ds.PatientSetupSequence = self._patient_setup_sequence()  # 300a,0180
         self.ds.IonToleranceTableSequence = self._ion_tolerance_table_sequence()  # 300a,03a0
         self.ds.IonControlPointSequence = self._ion_control_point_sequence()  # 300a,03a2
+        self.ds.ReferencedStructureSetSequence = self._referenced_structure_set_sequence()  # 300c,0060
 
-        self.ds[0x300b, 0x0010] = 'IMPAC'   # 300b,0010
-        self.ds[0x300b, 0x1008] = b'v1'     # 300b,1008
+        self.ds[0x300b, 0x0010] = 'IMPAC'           # 300b,0010
+        self.ds[0x300b, 0x1008] = b'v1'             # 300b,1008
 
-        self.ds.ApprovalStatus = 'APPROVED'   # 300e,0002
-        self.ds.ReviewDate = '20250101'   # 300e,0004
-        self.ds.ReviewTime = '120000'   # 300e,0005
-        self.ds.ReviewerName = 'DefaultReviewer'   # 300e,0008
+        self.ds.ApprovalStatus = 'APPROVED'         # 300e,0002
+        self.ds.ReviewDate = '20250101'             # 300e,0004
+        self.ds.ReviewTime = '120000'               # 300e,0005
+        self.ds.ReviewerName = 'DefaultReviewer'    # 300e,0008
 
         # Generate the XML string and its length
         xml_string = self._generate_xml_string()
@@ -100,18 +101,18 @@ class Dicom:
         """
         Create a FractionGroupSequence with a single item.
         """
-        fgs = pydicom.Sequence()  # 300a,0070
+        fgs = pydicom.Sequence()                            # 300a,0070
         fg = pydicom.Dataset()
-        fg.FractionGroupNumber = 1  # 300a,0071
-        fg.NumberOfFractionsPlanned = 1  # 300a,0078
-        fg.NumberOfBeams = 1  # 300a,0080
-        fg.NumberOfBrachyApplicationSetups = 0  # 300a,00a0
-        fg.ReferencedBeamSequence = pydicom.Sequence()  # 300c,0004
+        fg.FractionGroupNumber = 1                          # 300a,0071
+        fg.NumberOfFractionsPlanned = 1                     # 300a,0078
+        fg.NumberOfBeams = 1                                # 300a,0080
+        fg.NumberOfBrachyApplicationSetups = 0              # 300a,00a0
+        fg.ReferencedBeamSequence = pydicom.Sequence()      # 300c,0004
         fg.ReferencedBeamSequence.append(pydicom.Dataset())
-        fg.ReferencedBeamSequence[0].BeamDose = 1.0  # 300a,0084
-        fg.ReferencedBeamSequence[0].BeamMeterSet = 1.0  # 300a,0086
-        fg.ReferencedBeamSequence[0][0x3249, 0x0010] = 'Varian Medical Systems VISION 3249'
-        fg.ReferencedBeamSequence[0][0x3249, 0x1000] = dose_reference_uid.encode('ascii')
+        fg.ReferencedBeamSequence[0].BeamDose = 1.0         # 300a,0084
+        fg.ReferencedBeamSequence[0].BeamMeterSet = 1.0     # 300a,0086
+        fg.ReferencedBeamSequence[0][0x3249, 0x0010] = 'Varian Medical Systems VISION 3249'     # 3249,0010
+        fg.ReferencedBeamSequence[0][0x3249, 0x1000] = dose_reference_uid.encode('ascii')       # 3249,1000
         fgs.append(fg)
         return fgs
 
@@ -120,11 +121,11 @@ class Dicom:
         """
         Create a PatientSetupSequence with a single item.
         """
-        pss = pydicom.Sequence()  # 300a,0180
+        pss = pydicom.Sequence()            # 300a,0180
         ps = pydicom.Dataset()
-        ps.PatientPosition = 'HFS'  # 0018,5100
-        ps.PatientSetupNumber = 1  # 300a,0182
-        ps.SetupTechnique = 'ISOCENTRIC'  # 300a,01b0
+        ps.PatientPosition = 'HFS'          # 0018,5100
+        ps.PatientSetupNumber = 1           # 300a,0182
+        ps.SetupTechnique = 'ISOCENTRIC'    # 300a,01b0
         return pss
 
     @staticmethod
@@ -132,26 +133,26 @@ class Dicom:
         """
         Create an IonToleranceTableSequence with a single item.
         """
-        its = pydicom.Sequence()    # 300a,03a0
+        its = pydicom.Sequence()            # 300a,03a0
         it = pydicom.Dataset()
-        it.IonToleranceTableNumber = 1  # 300a,0042
-        it.ToleranceTableLabel = 'T1'  # 300a,0043
-        it.GantryAngleTolerance = 0.5   # 300a,0044
-        it.BeamLimitingDeviceToleranceSequence = pydicom.Sequence()  # 300a,0048
+        it.IonToleranceTableNumber = 1      # 300a,0042
+        it.ToleranceTableLabel = 'T1'       # 300a,0043
+        it.GantryAngleTolerance = 0.5       # 300a,0044
+        it.BeamLimitingDeviceToleranceSequence = pydicom.Sequence()                         # 300a,0048
         it.BeamLimitingDeviceToleranceSequence.append(pydicom.Dataset())
         it.BeamLimitingDeviceToleranceSequence[0].BeamLimitingDevicePositionTolerance = 0   # 300a,004a
-        it.BeamLimitingDeviceToleranceSequence[0].BeamLimitingDeviceType = 'X'  # 300a,00b8
+        it.BeamLimitingDeviceToleranceSequence[0].BeamLimitingDeviceType = 'X'              # 300a,00b8
         it.BeamLimitingDeviceToleranceSequence[0].BeamLimitingDevicePositionTolerance = 0   # 300a,004a
-        it.BeamLimitingDeviceToleranceSequence[0].BeamLimitingDeviceType = 'Y'  # 300a,00b8
-        it.SnoutPositionTolerance = 5.0  # 300a,004b
-        it.PatientSupportAngleTolerance = 3  # 300a,004c
+        it.BeamLimitingDeviceToleranceSequence[0].BeamLimitingDeviceType = 'Y'              # 300a,00b8
+        it.SnoutPositionTolerance = 5.0                                                     # 300a,004b
+        it.PatientSupportAngleTolerance = 3                                                 # 300a,004c
 
-        it.TableTopPitchAngleTolerance = 3.0  # 300a,004f
-        it.TableTopRollAngleTolerance = 3.0  # 300a,0050
+        it.TableTopPitchAngleTolerance = 3.0                # 300a,004f
+        it.TableTopRollAngleTolerance = 3.0                 # 300a,0050
 
-        it.TableTopVerticalPositionTolerance = 20.0  # 300a,0051
-        it.TableTopLongitudinalPositionTolerance = 20.0  # 300a,0052
-        it.TableTopLateralPositionTolerance = 20.0  # 300a,0053
+        it.TableTopVerticalPositionTolerance = 20.0         # 300a,0051
+        it.TableTopLongitudinalPositionTolerance = 20.0     # 300a,0052
+        it.TableTopLateralPositionTolerance = 20.0          # 300a,0053
         return its
 
     @staticmethod
@@ -161,11 +162,22 @@ class Dicom:
         """
         ics = pydicom.Sequence()
         ic = pydicom.Dataset()
-        ics.append(ic)
 
         # TODO
-
+        ics.append(ic)
         return ics
+
+    @staticmethod
+    def _referenced_structure_set_sequence():
+        """
+        Create a ReferencedStructureSetSequence with a single item.
+        """
+        rss = pydicom.Sequence()
+        rs = pydicom.Dataset()
+        rs.ReferencedSOPClassUID = pydicom.uid.generate_uid()       # 0008,1150
+        rs.ReferencedSOPInstanceUID = pydicom.uid.generate_uid()    # 0008,1155
+        rss.append(rs)
+        return rss
 
     @staticmethod
     def _generate_xml_string():
@@ -201,16 +213,16 @@ class Dicom:
 
     @staticmethod
     def _dose_reference_sequence():
-        drs = pydicom.Sequence()   # 300a,0010
+        drs = pydicom.Sequence()                            # 300a,0010
         dr = pydicom.Dataset()
-        dr.DoseReferenceNumber = 1   # 300a,0012
-        dr.DoseReferenceUID = pydicom.uid.generate_uid()   # 300a,0013
-        dr.DoseReferenceStructureType = 'SITE'   # 300a,0014
-        dr.DoseReferenceDescription = 'Target'   # 300a,0016
-        dr.DoseReferenceType = 'POINT'   # 300a,0020
-        dr.DoseReferencePointCoordinates = [0.0, 0.0, 0.0]   # 300a,0022
-        dr.DeliveryMaximumDose = 1.0   # 300a,0023
-        dr.PointDose = 1.0   # 300a,0024
+        dr.DoseReferenceNumber = 1                          # 300a,0012
+        dr.DoseReferenceUID = pydicom.uid.generate_uid()    # 300a,0013
+        dr.DoseReferenceStructureType = 'SITE'              # 300a,0014
+        dr.DoseReferenceDescription = 'Target'              # 300a,0016
+        dr.DoseReferenceType = 'POINT'                      # 300a,0020
+        dr.DoseReferencePointCoordinates = [0.0, 0.0, 0.0]  # 300a,0022
+        dr.DeliveryMaximumDose = 1.0                        # 300a,0023
+        dr.PointDose = 1.0                                  # 300a,0024
 
         dr[0x3267, 0x0010] = 'Varian Medical Systems VISION 3267'
         dr[0x3267, 0x1000] = b'Target'
