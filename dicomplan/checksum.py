@@ -7,8 +7,10 @@ from pydicom.filebase import DicomBytesIO
 from pydicom.filewriter import write_dataset
 from pydicom.tag import Tag
 
-# --- Step 1: Extract and parse the XML blob ---
+# This script was just various snippets to test the idea whether the XML stream defined what to hash.
 
+
+# --- Step 1: Extract and parse the XML blob ---
 
 def parse_referenced_indices(ds):
     xml_tag = Tag(0x3253, 0x1000)
