@@ -31,7 +31,7 @@ def ion_control_point() -> pydicom.Dataset:
     icp.SnoutPosition = 421.0                                     # 300a,030d
     icp.MetersetRate = 0.0                                        # 300a,035a
 
-    icp.LateralSpreadingDeviceSequence = pydicom.Sequence([lateral_spreading_device()])  # 300a,0370
+    icp.LateralSpreadingDeviceSequence = pydicom.Sequence(lateral_spreading_device())  # 300a,0370
 
     icp.ScanSpotTuneID = '4.0'                                    # 300a,0390
 
@@ -42,8 +42,8 @@ def ion_control_point() -> pydicom.Dataset:
     icp.NumberOfPaintings = 1                                     # 300a,039a
 
     # Private Tag (IMPAC)
-    icp[0x300b, 0x0010] = 'IMPAC'                                 # 300b,0010
-    icp[0x300b, 0x1017] = b'x\xaf\xaaB'                           # 300b,1017  unknown,
+    icp[0x300b, 0x0010] = pydicom.DataElement(0x300b0010, 'SH', 'IMPAC')   # 300b,0010
+    icp[0x300b, 0x1017] = pydicom.DataElement(0x300b1017, 'UN', b'x\xaf\xaaB')                           # 300b,1017  unknown,
     # but similar to  (300B,1004) 85.00868225097656 4-byte float little endian
     # struct.unpack('<f', b'x\xaf\xaaB')  # → (85.33678436279297,)
 

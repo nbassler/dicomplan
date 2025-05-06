@@ -19,6 +19,19 @@ class Dicom:
         self.ds = pydicom.Dataset()
         self._set_static_tags()
 
+    def write(self, filename: str):
+        """
+        Write the DICOM dataset to a file.
+        """
+        # Set the file meta information
+        self.ds.file_meta = pydicom.Dataset()
+        self.ds.file_meta.TransferSyntaxUID = pydicom.uid.ExplicitVRLittleEndian
+        self.ds.is_implicit_VR = False
+        self.ds.is_little_endian = True
+
+        # Save the dataset to a file
+        pydicom.dcmwrite(filename, self.ds, write_like_original=False)
+
     def _set_static_tags(self):
         """
         Set static DICOM tags for the dataset.
@@ -37,8 +50,8 @@ class Dicom:
         self.ds.StationName = 'VADB101'                     # 0008,1010
         self.ds.StudyDescription = ''                       # 0008,1030
         self.ds.SeriesDescription = 'ARIA RadOnc Plans'     # 0008,103e
-        self.ds.OperatorName = 'DefaultOperator'            # 0008,1070
-        self.ds.ManufacturersModelName = 'ARIA RadOnc'      # 0008,1090
+        self.ds.OperatorsName = 'DefaultOperator'            # 0008,1070
+        self.ds.ManufacturerModelName = 'ARIA RadOnc'      # 0008,1090
 
         self.ds.PatientName = 'DefaultName'                 # 0010,0010
         self.ds.PatientID = 'DefaultID'                     # 0010,0020
@@ -74,8 +87,8 @@ class Dicom:
         self.ds.IonBeamSequence = pydicom.Sequence([ion_beam()])  # 300a,03a2
         self.ds.ReferencedStructureSetSequence = pydicom.Sequence([self._referenced_structure_set()])  # 300c,0060
 
-        self.ds[0x300b, 0x0010] = 'IMPAC'           # 300b,0010
-        self.ds[0x300b, 0x1008] = b'v1'             # 300b,1008
+        self.ds[0x300b, 0x0010] = pydicom.DataElement(0x300b0010, 'SH', 'IMPAC')  # 300b,0010
+        self.ds[0x300b, 0x1008] = pydicom.DataElement(0x300b1008, 'UN', b'v1')    # 300b,1008
 
         self.ds.ApprovalStatus = 'APPROVED'         # 300e,0002
         self.ds.ReviewDate = '20250101'             # 300e,0004
@@ -85,19 +98,20 @@ class Dicom:
         # Generate the XML string and its length
         xml_string = self._generate_xml_string()
         xml_length = len(xml_string)
+        length_bytes = str(xml_length).encode('ascii') + b' '
 
         # Set the private tag with the XML string
-        self.ds[0x3253, 0x0010] = 'Varian Medical Systems VISION 3253'
-        self.ds[0x3253, 0x1000] = pydicom.DataElement(0x32531000, 'LO', xml_string)
-        self.ds[0x3253, 0x1001] = pydicom.DataElement(0x32531001, 'US', xml_length)
+        self.ds[0x3253, 0x0010] = pydicom.DataElement(0x32530010, 'LO', 'Varian Medical Systems VISION 3253')
+        self.ds[0x3253, 0x1000] = pydicom.DataElement(0x32531000, 'UN', xml_string)
+        self.ds[0x3253, 0x1001] = pydicom.DataElement(0x32531001, 'UN', length_bytes)
 
         logging.debug(f"XML string: {xml_string}")
         logging.debug(f"XML string length: {xml_length}")
 
-        self.ds[0x3253, 0x1002] = ''
+        self.ds[0x3253, 0x1002] = pydicom.DataElement(0x32531002, 'UN', b'ExtendedIF')
 
-        self.ds[0x3287, 0x0010] = 'Varian Medical Systems VISION 3287'
-        self.ds[0x3287, 0x1000] = self._generate_checksum()
+        self.ds[0x3287, 0x0010] = pydicom.DataElement(0x32870010, 'LO', 'Varian Medical Systems VISION 3287')
+        self.ds[0x3287, 0x1000] = pydicom.DataElement(0x32871000, 'UN', self._generate_checksum())
 
     @staticmethod
     def _referenced_structure_set():
@@ -116,30 +130,29 @@ class Dicom:
         """
         root = ET.Element("ExtendedVAPlanInterface", Version="1")
 
-        beams = ET.SubElement(root, "Beams")
-        beam = ET.SubElement(beams, "Beam")
-        ET.SubElement(beam, "ReferencedBeamNumber").text = "1"
-        beam_extension = ET.SubElement(beam, "BeamExtension")
-        ET.SubElement(beam_extension, "FieldOrder").text = "1"
-        ET.SubElement(beam_extension, "GantryRtnExtendedStart").text = "false"
-        ET.SubElement(beam_extension, "GantryRtnExtendedStop").text = "false"
+        _beams = ET.SubElement(root, "Beams")
+        _beam = ET.SubElement(_beams, "Beam")
+        ET.SubElement(_beam, "ReferencedBeamNumber").text = "1"
+        _beam_ext = ET.SubElement(_beam, "BeamExtension")
+        ET.SubElement(_beam_ext, "FieldOrder").text = "1"
+        ET.SubElement(_beam_ext, "GantryRtnExtendedStart").text = "false"
+        ET.SubElement(_beam_ext, "GantryRtnExtendedStop").text = "false"
 
-        tolerance_tables = ET.SubElement(root, "ToleranceTables")
-        tolerance_table = ET.SubElement(tolerance_tables, "ToleranceTable")
-        ET.SubElement(tolerance_table, "ReferencedToleranceTableNumber").text = "1"
-        tolerance_table_extension = ET.SubElement(tolerance_table, "ToleranceTableExtension")
-        ET.SubElement(tolerance_table_extension, "CollXSetup").text = "Automatic"
-        ET.SubElement(tolerance_table_extension, "CollYSetup").text = "Automatic"
+        _tables = ET.SubElement(root, "ToleranceTables")
+        _table = ET.SubElement(_tables, "ToleranceTable")
+        ET.SubElement(_table, "ReferencedToleranceTableNumber").text = "1"
+        _table_ext = ET.SubElement(_table, "ToleranceTableExtension")
+        ET.SubElement(_table_ext, "CollXSetup").text = "Automatic"
+        ET.SubElement(_table_ext, "CollYSetup").text = "Automatic"
 
-        _dose_references = ET.SubElement(root, "DoseReferences")
-        _dose_reference = ET.SubElement(_dose_references, "DoseReference")
-        ET.SubElement(dose_reference, "ReferencedDoseReferenceNumber").text = "1"
-        dose_reference_extension = ET.SubElement(_dose_reference, "DoseReferenceExtension")
-        ET.SubElement(dose_reference_extension, "DailyDoseLimit").text = "2"
-        ET.SubElement(dose_reference_extension, "SessionDoseLimit").text = "2"
+        _refs = ET.SubElement(root, "DoseReferences")
+        _ref = ET.SubElement(_refs, "DoseReference")
+        ET.SubElement(_ref, "ReferencedDoseReferenceNumber").text = "1"
+        _ref_ext = ET.SubElement(_ref, "DoseReferenceExtension")
+        ET.SubElement(_ref_ext, "DailyDoseLimit").text = "2"
+        ET.SubElement(_ref_ext, "SessionDoseLimit").text = "2"
 
-        xml_string = ET.tostring(root, encoding='Windows-1252', xml_declaration=True)
-        return xml_string
+        return ET.tostring(root, encoding='Windows-1252', xml_declaration=True)
 
     @staticmethod
     def _generate_checksum():

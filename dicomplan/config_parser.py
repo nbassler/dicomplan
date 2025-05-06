@@ -8,7 +8,7 @@ def parse_arguments(args=None):
     parser = argparse.ArgumentParser(
         description='Create simple ECLIPSE DICOM proton therapy treatment plans.')
 
-    parser.add_argument('-o', '--output', default="output.dcm",
+    parser.add_argument('-o', '--output', type=str, default="output.dcm",
                         help='Path to output DICOM file')
     parser.add_argument('-g', '--gantry_angles', type=str, default=None,
                         help='List of comma-separated gantry angles')

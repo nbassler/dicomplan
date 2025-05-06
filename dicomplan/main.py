@@ -1,4 +1,5 @@
 from dicomplan.config_parser import parse_arguments
+from dicomplan.dicom import Dicom
 import sys
 import logging
 
@@ -23,6 +24,9 @@ def main(args=None):
         logging.basicConfig()
 
     print(parsed_args.reviewer_name)
+
+    d = Dicom()
+    d.write(parsed_args.output)
 
 
 if __name__ == '__main__':

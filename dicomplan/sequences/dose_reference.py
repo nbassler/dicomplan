@@ -13,10 +13,10 @@ def dose_reference():
     ds.DoseReferenceType = 'POINT'                      # (300a,0020)
     ds.DoseReferencePointCoordinates = [0.0, 0.0, 0.0]   # (300a,0022)
     ds.DeliveryMaximumDose = 1.0                        # (300a,0023)
-    ds.PointDose = 1.0                                  # (300a,0024)
+    ds.OrganAtRiskMaximumDose = 1.0                     # (300a,002c)
 
     # Optional Varian private tag
-    ds[0x3267, 0x0010] = 'Varian Medical Systems VISION 3267'
-    ds[0x3267, 0x1000] = b'Target'
+    ds[0x3267, 0x0010] = pydicom.DataElement(0x32670010, 'LO', 'Varian Medical Systems VISION 3267')
+    ds[0x3267, 0x1000] = pydicom.DataElement(0x32671000, 'UN', b'Target')
 
     return ds

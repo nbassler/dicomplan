@@ -1,4 +1,4 @@
-# import pydicom
+from pydicom import DataElement
 from pydicom.dataset import Dataset
 from pydicom.sequence import Sequence
 
@@ -22,7 +22,7 @@ def _referenced_beam(dose_reference_uid: str) -> Dataset:
     """
     rb = Dataset()
     rb.BeamDose = 1.0                                   # 300A,0084
-    rb.BeamMeterSet = 1.0                               # 300A,0086
-    rb[0x3249, 0x0010] = 'Varian Medical Systems VISION 3249'  # Private creator
-    rb[0x3249, 0x1000] = dose_reference_uid.encode('ascii')    # Private tag
+    rb.BeamMeterset = 1.0                               # 300A,0086
+    rb[0x3249, 0x0010] = DataElement(0x32490010, 'LO', 'Varian Medical Systems VISION 3249')
+    rb[0x3249, 0x1000] = DataElement(0x32491000, 'UI', dose_reference_uid.encode('ascii'))    # Private tag
     return rb
