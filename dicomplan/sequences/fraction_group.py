@@ -23,6 +23,8 @@ def _referenced_beam(dose_reference_uid: str) -> Dataset:
     rb = Dataset()
     rb.BeamDose = 1.0                                   # 300A,0084
     rb.BeamMeterset = 1.0                               # 300A,0086
+    rb.ReferencedBeamNumber = 1                         # 300C,0006
     rb[0x3249, 0x0010] = DataElement(0x32490010, 'LO', 'Varian Medical Systems VISION 3249')
-    rb[0x3249, 0x1000] = DataElement(0x32491000, 'UI', dose_reference_uid.encode('ascii'))    # Private tag
+    rb[0x3249, 0x1010] = DataElement(0x32491010, 'UI', dose_reference_uid)    # Private tag
+    # rb[0x3249, 0x1010] = DataElement(0x32491010, 'UI', b'1.2.246.352.71.10.361940808526.5131.20190916150554')
     return rb

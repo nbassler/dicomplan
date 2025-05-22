@@ -1,4 +1,6 @@
 import pydicom
+from pydicom.uid import ImplicitVRLittleEndian
+
 import logging
 import xml.etree.ElementTree as ET
 # import numpy as np
@@ -23,14 +25,22 @@ class Dicom:
         """
         Write the DICOM dataset to a file.
         """
-        # Set the file meta information
+        # Set required file meta
         self.ds.file_meta = pydicom.Dataset()
-        self.ds.file_meta.TransferSyntaxUID = pydicom.uid.ExplicitVRLittleEndian
-        self.ds.is_implicit_VR = False
-        self.ds.is_little_endian = True
+        self.ds.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian
+        self.ds.file_meta.MediaStorageSOPClassUID = self.ds.SOPClassUID
+        self.ds.file_meta.MediaStorageSOPInstanceUID = self.ds.SOPInstanceUID
+        self.ds.file_meta.ImplementationClassUID = pydicom.uid.PYDICOM_IMPLEMENTATION_UID
 
-        # Save the dataset to a file
-        pydicom.dcmwrite(filename, self.ds, write_like_original=False)
+        # Save using the correct flags
+        pydicom.dcmwrite(
+            filename,
+            self.ds,
+            # write_like_original=False,
+            enforce_file_format=True,
+            implicit_vr=True,
+            little_endian=True
+        )
 
     def _set_static_tags(self):
         """
@@ -39,10 +49,14 @@ class Dicom:
         self.ds.SpecificCharacterSet = 'ISO_IR 192'         # 0008,0005
         self.ds.InstanceCreationDate = '20250101'           # 0008,0012
         self.ds.InstanceCreationTime = '120000'             # 0008,0013
-        self.ds.SOPClassUID = pydicom.uid.generate_uid()    # 0008,0016
-        self.ds.SOPInstanceUID = pydicom.uid.generate_uid()  # 0008,0018
+        # self.ds.SOPClassUID = pydicom.uid.generate_uid()    # 0008,0016
+        # self.ds.SOPInstanceUID = pydicom.uid.generate_uid()  # 0008,0018
+
+        self.ds.SOPClassUID = '1.2.840.10008.5.1.4.1.1.481.8'
+        self.ds.SOPInstanceUID = '1.2.246.352.71.5.361940808526.21506.20191103151832'
+
         self.ds.StudyDate = '20250101'                      # 0008,0020
-        self.ds.StudyTime = '120000'                        # 0008,0030
+        self.ds.StudyTime = '124408.887'                    # 0008,0030
         self.ds.AccessionNumber = ''                        # 0008,0050
         self.ds.Modality = 'RTPLAN'                         # 0008,0060
         self.ds.Manufacturer = 'Varian Medical Systems'     # 0008,0070
@@ -58,19 +72,23 @@ class Dicom:
         self.ds.PatientBirthDate = '19700101'               # 0010,0030
         self.ds.PatientSex = ''                             # 0010,0040
 
-        self.ds.DeviceSerialNumber = '123456789012'         # 0018,1000
-        self.ds.SoftwareVersions = '0.0'                    # 0018,1020
+        self.ds.DeviceSerialNumber = '361940808526'         # 0018,1000
+        self.ds.SoftwareVersions = '13.7.33'                    # 0018,1020
 
-        self.ds.StudyInstanceUID = pydicom.uid.generate_uid()   # 0020,000d
-        self.ds.SeriesInstanceUID = pydicom.uid.generate_uid()  # 0020,000e
+        # self.ds.StudyInstanceUID = pydicom.uid.generate_uid()   # 0020,000d
+        # self.ds.SeriesInstanceUID = pydicom.uid.generate_uid()  # 0020,000e
+        self.ds.StudyInstanceUID = '1.2.246.352.205.5379576546120926927.16596583169698917258'
+        self.ds.SeriesInstanceUID = '1.2.246.352.71.2.361940808526.221621.20190916145704'
+
         self.ds.StudyID = 'Phantom1'                            # 0020,0010
-        self.ds.SeriesNumber = '1'                              # 0020,0011
-        self.ds.FrameOfReferenceUID = pydicom.uid.generate_uid()   # 0020,0052
+        self.ds.SeriesNumber = '2'                              # 0020,0011
+        # self.ds.FrameOfReferenceUID = pydicom.uid.generate_uid()   # 0020,0052
+        self.ds.FrameOfReferenceUID = '1.2.246.352.205.5293866479401426372.4409618553988963736'
         self.ds.PositionReferenceIndicator = ''                 # 0020,1040
 
         self.ds.RTPlanLabel = 'DefaultLabel'                 # 300a,0002
         self.ds.RTPlanDate = '20250101'                      # 300a,0006
-        self.ds.RTPlanTime = '120000'                        # 300a,0007
+        self.ds.RTPlanTime = '162136.13'                        # 300a,0007
         self.ds.PlanIntent = 'CURATIVE'                      # 300a,000a
         self.ds.RTPlanGeometry = 'PATIENT'                   # 300a,000c
 
@@ -92,7 +110,7 @@ class Dicom:
 
         self.ds.ApprovalStatus = 'APPROVED'         # 300e,0002
         self.ds.ReviewDate = '20250101'             # 300e,0004
-        self.ds.ReviewTime = '120000'               # 300e,0005
+        self.ds.ReviewTime = '162136.223'               # 300e,0005
         self.ds.ReviewerName = 'DefaultReviewer'    # 300e,0008
 
         # Generate the XML string and its length
@@ -111,7 +129,7 @@ class Dicom:
         self.ds[0x3253, 0x1002] = pydicom.DataElement(0x32531002, 'UN', b'ExtendedIF')
 
         self.ds[0x3287, 0x0010] = pydicom.DataElement(0x32870010, 'LO', 'Varian Medical Systems VISION 3287')
-        self.ds[0x3287, 0x1000] = pydicom.DataElement(0x32871000, 'UN', self._generate_checksum())
+        # self.ds[0x3287, 0x1000] = pydicom.DataElement(0x32871000, 'UN', self._generate_checksum())
 
     @staticmethod
     def _referenced_structure_set():
@@ -119,8 +137,11 @@ class Dicom:
         Create a ReferencedStructureSetSequence with a single item.
         """
         rs = pydicom.Dataset()
-        rs.ReferencedSOPClassUID = pydicom.uid.generate_uid()       # 0008,1150
-        rs.ReferencedSOPInstanceUID = pydicom.uid.generate_uid()    # 0008,1155
+        # rs.ReferencedSOPClassUID = pydicom.uid.generate_uid()       # 0008,1150
+        rs.ReferencedSOPClassUID = '1.2.840.10008.5.1.4.1.1.481.3'
+        # rs.ReferencedSOPInstanceUID = pydicom.uid.generate_uid()    # 0008,1155
+        rs.ReferencedSOPInstanceUID = '1.2.246.352.71.4.361940808526.12071.20190918133435'
+
         return rs
 
     @staticmethod
@@ -204,5 +225,8 @@ class Dicom:
             checksum_identifier +
             separator_2
         )
+
+        if len(mixed_content) % 2 == 1:
+            mixed_content += b'\x00'
 
         return mixed_content

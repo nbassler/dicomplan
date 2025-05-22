@@ -1,5 +1,8 @@
 import pydicom
-from dicomplan.sequences.ion_control_point import ion_control_point
+import struct
+# from pydicom import Dataset
+# from pydicom.sequence import Sequence
+from dicomplan.sequences.ion_control_point import ion_control_points
 
 
 def ion_beam() -> pydicom.Dataset:
@@ -8,7 +11,7 @@ def ion_beam() -> pydicom.Dataset:
     """
     ib = pydicom.Dataset()
 
-    ib.Manufacturer = 'Varian Medical Systems Particle Therapy'  # 0008,0070
+    ib.Manufacturer = 'Varian Medical System Particle Therapy'  # 0008,0070
     ib.ManufacturerModelName = 'VPT'  # 0008,01090
     ib.TreatmentMachineName = 'TR4'  # 300a,00b2
     ib.PrimaryDosimeterUnit = 'MU'  # 300a,00b3
@@ -22,8 +25,8 @@ def ion_beam() -> pydicom.Dataset:
     ib.NumberOfBoli = 0  # 300a,00ed
     ib.NumberOfBlocks = 0  # 300a,00f0
 
-    ib.FinalCumulativeMetersetWeight = 1.0  # 300a,010e
-    ib.NumberOfControlPoints = 1  # 300a,0110
+    ib.FinalCumulativeMetersetWeight = 16.0  # 300a,010e
+    ib.NumberOfControlPoints = 2  # 300a,0110  #TODO
     ib.ScanMode = 'MODULATED'  # 300a,0308
     ib.VirtualSourceAxisDistances = [2000.0, 2560.0]  # 300a,030a
     ib.SnoutSequence = pydicom.Sequence([snout()])
@@ -34,12 +37,16 @@ def ion_beam() -> pydicom.Dataset:
     ib.PatientSupportType = 'TABLE'  # 300a,0350
     ib.PatientSupportID = 'Couch'  # 300a,0352
     ib.PatientSupportAccessoryCode = 'AC123'  # 300a,0354
-    ib.IonControlPointSequence = pydicom.Sequence([ion_control_point()])  # 300a,03a8
+    ib.IonControlPointSequence = pydicom.Sequence(ion_control_points())  # 300a,03a8
 
     ib[0x300b, 0x0010] = pydicom.DataElement(0x300b0010, 'SH', 'IMPAC')                    # 300b,0010 (unknown)
-    ib[0x300b, 0x1002] = pydicom.DataElement(0x300b1002, 'DS', 500.0)                      # 300b,1002 (unknown)
-    ib[0x300b, 0x1004] = pydicom.DataElement(0x300b1004, 'DS', 85.00868225097656)          # 300b,1004 (unknown)
-    ib[0x300b, 0x100e] = pydicom.DataElement(0x300b100e, 'DS', 31.185909271240234)         # 300b,100e (unknown)
+    ib[0x300b, 0x1002] = pydicom.DataElement(0x300b1002, 'UN', struct.pack('<f', 500.0))
+    ib[0x300b, 0x1004] = pydicom.DataElement(0x300b1004, 'UN', struct.pack('<f', 85.00868225097656))
+    ib[0x300b, 0x100e] = pydicom.DataElement(0x300b100e, 'UN', struct.pack('<f', 31.185909271240234))
+
+    # ib[0x300b, 0x1002] = pydicom.DataElement(0x300b1002, 'DS', struct.pack('<f', 500.0))   # 300b,1002 (unknown)
+    # ib[0x300b, 0x1004] = pydicom.DataElement(0x300b1004, 'DS', 85.00868225097656)          # 300b,1004 (unknown)
+    # ib[0x300b, 0x100e] = pydicom.DataElement(0x300b100e, 'DS', 31.185909271240234)         # 300b,100e (unknown)
 
     ib.ReferencedPatientSetupNumber = 1     # 300c,006a
     ib.ReferencedToleranceTableNumber = 1   # 300c,00a0

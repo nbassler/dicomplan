@@ -11,12 +11,13 @@ def ion_tolerance_table():
     it.GantryAngleTolerance = 0.5       # 300a,0044
     it.BeamLimitingDeviceToleranceSequence = pydicom.Sequence()                         # 300a,0048
     it.BeamLimitingDeviceToleranceSequence.append(pydicom.Dataset())
-    it.BeamLimitingDeviceToleranceSequence[0].BeamLimitingDevicePositionTolerance = 0   # 300a,004a
-    it.BeamLimitingDeviceToleranceSequence[0].RTBeamLimitingDeviceType = 'X'              # 300a,00b8
-    it.BeamLimitingDeviceToleranceSequence[0].BeamLimitingDevicePositionTolerance = 0   # 300a,004a
-    it.BeamLimitingDeviceToleranceSequence[0].RTBeamLimitingDeviceType = 'Y'              # 300a,00b8
+    it.BeamLimitingDeviceToleranceSequence[0].BeamLimitingDevicePositionTolerance = '0'   # 300a,004a
+    it.BeamLimitingDeviceToleranceSequence[0].RTBeamLimitingDeviceType = 'X'
+    it.BeamLimitingDeviceToleranceSequence.append(pydicom.Dataset())              # 300a,00b8
+    it.BeamLimitingDeviceToleranceSequence[1].BeamLimitingDevicePositionTolerance = '0'   # 300a,004a
+    it.BeamLimitingDeviceToleranceSequence[1].RTBeamLimitingDeviceType = 'Y'              # 300a,00b8
     it.SnoutPositionTolerance = 5.0                                                     # 300a,004b
-    it.PatientSupportAngleTolerance = 3                                                 # 300a,004c
+    it.PatientSupportAngleTolerance = '3'                                                 # 300a,004c
 
     it.TableTopPitchAngleTolerance = 3.0                # 300a,004f
     it.TableTopRollAngleTolerance = 3.0                 # 300a,0050
