@@ -1,17 +1,18 @@
 import pydicom
 from pydicom.uid import ImplicitVRLittleEndian
 
+import datetime
 import logging
 import xml.etree.ElementTree as ET
-# import numpy as np
+import numpy as np
 
 from sequences.dose_reference import dose_reference
 from sequences.fraction_group import fraction_group
 from sequences.patient_setup import patient_setup
 from sequences.ion_tolerance_table import ion_tolerance_table
 from sequences.ion_beam import ion_beam
-# from sequences.ion_control_point import ion_control_point
-# from sequences.referenced_structure_set import referenced_structure_set
+from dicomplan.spots import generate_spot_pattern
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,73 @@ class Dicom:
     def __init__(self):
         self.ds = pydicom.Dataset()
         self._set_static_tags()
+
+    def apply_model(self, model):
+        """
+        Apply the model to the DICOM dataset.
+        """
+
+        logger.debug("apply_model()")
+
+        self.ds.PatientName = model.plan_patient_name
+        self.ds.PatientID = model.plan_patient_id
+        self.ds.OperatorsName = model.plan_operator_name
+        self.ds.ReviewerName = model.plan_reviewer_name
+        self.ds.RTPlanLabel = model.plan_label
+
+        # set current date and time
+        now = datetime.datetime.now()
+        self.ds.StudyDate = now.strftime('%Y%m%d')
+        self.ds.StudyTime = now.strftime('%H%M%S.%f')[:-3]
+
+        # get the spot pattern
+        coords, weights = generate_spot_pattern(model)
+        nspots = len(coords) // 2  # total number of spots
+        zero_weights = np.zeros(nspots)
+        logger.info(f"number of spots: {nspots}")
+
+        # check if coords length is exactly 2*nspots
+        if len(coords) != 2 * nspots:
+            raise ValueError(f"coords length {len(coords)} is not equal to 2*nspots {2 * nspots}")
+
+        # set total plan MU. For now there is only a single energy layer.
+        total_mus = nspots * model.spot_mu
+        self.ds.FractionGroupSequence[0].ReferencedBeamSequence[0].BeamMeterset = total_mus
+        logger.info(f"total MU: {total_mus}")
+
+        cum_weight = 0.0
+
+        # temporary for tests
+        weights *= 40.0
+
+        coords_mm = coords * 10.0  # convert to mm
+
+        for _i, ib in enumerate(self.ds.IonBeamSequence):
+            logger.debug(f"apply_model() - ion beam number {_i}")
+            # set treatment machine
+            ib.TreatmentMachineName = model.field_treatment_machine
+
+            for cp_idx, icp in enumerate(ib.IonControlPointSequence):
+                icp.ControlPointIndex = cp_idx
+                icp.NominalBeamEnergy = model.spot_energy
+                if cp_idx == 0:
+                    icp.GantryAngle = model.field_gantry_angle
+                    # TODO:set table positions
+                    # TODO:set snout position
+                icp.CumulativeMetersetWeight = cum_weight  # value before spots are delivered
+
+                icp.NumberOfScanSpotPositions = nspots  # TODO: multiple layer handling.
+                icp.ScanSpotPositionMap = coords_mm.tolist()
+
+                # if control point index is even, fill weights, otherwise set to 0
+                if icp.ControlPointIndex % 2 == 0:
+                    icp.ScanSpotMetersetWeights = weights.tolist()
+                    # we will let the cumulative weight range from 0 to 1.
+                    cum_weight += sum(weights)
+                else:
+                    icp.ScanSpotMetersetWeights = zero_weights.tolist()
+            ib.FinalCumulativeMetersetWeight = cum_weight
+            logger.debug(f"apply_model() - FinalCumulativeMetersetWeight: {cum_weight}")
 
     def write(self, filename: str):
         """
