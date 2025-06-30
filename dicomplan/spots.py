@@ -41,6 +41,8 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
      xn, y0, ..., xn, yn] format.
     """
 
+    logger.debug("Generating square pattern with spot spacing %s cm", model.spot_spacing)
+
     if model.spot_pattern_type == 'hexagonal':
         # in case of hexagonal pattern, we need to calculate the coordinates differently
         # every second line will be shifted by half the spacing
@@ -57,9 +59,25 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
         num_spots_x = int((model.spot_xymax[0] - model.spot_xymin[0]) / model.spot_spacing)
         num_spots_y = int((model.spot_xymax[1] - model.spot_xymin[1]) / model.spot_spacing)
 
+        logger.debug("Number of spots in x direction: %d", num_spots_x)
+        logger.debug("Number of spots in y direction: %d", num_spots_y)
+
         # Create a grid of spots
-        x_coords = np.linspace(model.spot_xymin[0], model.spot_xymax[0], num_spots_x)
-        y_coords = np.linspace(model.spot_xymin[1], model.spot_xymax[1], num_spots_y)
+        if model.spot_spacing > 0:
+            # Use arange to ensure we cover the entire range with the specified spacing
+            # This ensures that the last spot is included if it fits within the bounds
+            x_coords = np.arange(model.spot_xymin[0],
+                                 model.spot_xymax[0] + model.spot_spacing * 0.5,
+                                 model.spot_spacing)
+            y_coords = np.arange(model.spot_xymin[1],
+                                 model.spot_xymax[1] + model.spot_spacing * 0.5,
+                                 model.spot_spacing)
+        else:
+            # alternatively,
+            # if now spot spacing was given, we can use linspace to ensure we cover the entire range
+            # but then the spot spacing is changed so the corners always align with the requested rectangle
+            x_coords = np.linspace(model.spot_xymin[0], model.spot_xymax[0], num_spots_x)
+            y_coords = np.linspace(model.spot_xymin[1], model.spot_xymax[1], num_spots_y)
 
     coords = _flat_grid(x_coords, y_coords)
     assert len(coords) % 2 == 0, "Coordinate list must contain pairs (x, y)"

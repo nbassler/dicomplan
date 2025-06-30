@@ -28,11 +28,10 @@ def main(args=None):
     else:
         logging.basicConfig()
 
-    print(parsed_args.reviewer_name)
-
     d = Dicom()
     d.apply_model(m)
     d.write(m.output_path)
+    logger.info(f"Plan written to {m.output_path}")
 
 
 if __name__ == '__main__':

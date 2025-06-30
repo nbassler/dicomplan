@@ -7,7 +7,7 @@ authors = [
 ]
 license = { text = "MIT" }
 readme = "README.md"
-dependencies = ["pydicom>=2.3.1", "numpy>=1.23.5"]
+dependencies = ["pydicom>=2.3.1", "numpy>=1.23.5", "Pillow>=9.5.0"]
 dynamic = ["version"]
 
 
