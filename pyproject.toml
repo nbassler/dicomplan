@@ -1,6 +1,9 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "dicomplan"
-# version = "0.1.0"
 description = "Create simple DICOM plan for proton therapy facilities."
 authors = [
     { name = "Niels Bassler", email = "nbassler@users.noreply.github.com" },
@@ -9,13 +12,13 @@ license = { text = "MIT" }
 readme = "README.md"
 dependencies = ["pydicom>=2.3.1", "numpy>=1.23.5", "Pillow>=9.5.0"]
 dynamic = ["version"]
+keywords = ["dicom", "RTPLAN", "radiotherapy"]
 
-
-[tool.setuptools]
-packages = ["dicomplan"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dicomplan*"]
 
 [project.optional-dependencies]
-web = ["streamlit>=1.12.0"]
 dev = ["flake8>=6.0.0", "pytest>=7.2.1"]
 
 [tool.pytest.ini_options]
@@ -36,5 +39,6 @@ based_on_style = "pep8"
 column_limit = 127
 
 [tool.setuptools_scm]
-version_scheme = "guess-next-dev"
-local_scheme = "node-and-timestamp"
+version_scheme = "post-release"
+local_scheme = "node-and-date"
+write_to = "dicomplan/__version__.py"

@@ -74,6 +74,13 @@ class Dicom:
                     icp.GantryAngle = model.field_gantry_angle
                     # TODO:set table positions
                     # TODO:set snout position
+
+                icp.TableTopVerticalPosition = model.field_table_position[0]
+                icp.TableTopLongitudinalPosition = model.field_table_position[1]
+                icp.TableTopLateralPosition = model.field_table_position[2]
+
+                icp.IsocenterPosition = [0.0, 0.0, 0.0]  # assuming iso at origin
+
                 icp.CumulativeMetersetWeight = cum_weight  # value before spots are delivered
 
                 icp.NumberOfScanSpotPositions = nspots  # TODO: multiple layer handling.
