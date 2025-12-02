@@ -22,8 +22,7 @@ def parse_arguments(args=None):
     parser.add_argument('-g', '--gantry_angle', type=str, default=90.0,
                         help='Gantry angle [degrees]. ')
     parser.add_argument('-tp', '--table_position', type=str, default="0.0,0.0,0.0",
-                        help='New table position vertical,longitudinal,lateral [cm]. ' +
-                             'Negative values should be in quotes and leading space.')
+                        help='New table position vertical,longitudinal,lateral [cm].')
     parser.add_argument('-sp', '--snout_position', type=float, default="42.1",
                         help='Set new snout position [cm]')
     parser.add_argument('-tm', '--treatment_machine', type=str, default="tr4",
@@ -49,8 +48,8 @@ def parse_arguments(args=None):
 
 # Square pattern
     square = subparsers.add_parser('square', help='Generate a square spot pattern')
-    square.add_argument('width', type=float, help='Field width [cm]')
-    square.add_argument('height', type=float, help='Field height [cm]')
+    square.add_argument('dx', type=float, help='Field width x [cm]')
+    square.add_argument('dy', type=float, help='Field height y [cm]')
     square.add_argument('--spacing', type=float, default=DEFAULT_SPOT_SPACING,
                         help='Spot spacing [cm]')
     square.add_argument('--mu-per-spot', type=float, default=DEFAULT_MU_PER_SPOT,
@@ -151,8 +150,8 @@ def get_model_from_args(args) -> PlanInputModel:
     # Set the pattern type and parameters based on subparser choice
     if args.pattern_type == 'square':
         model.spot_shape = 'square'
-        model.spot_xymin = [-args.width / 2, -args.height / 2]
-        model.spot_xymax = [args.width / 2, args.height / 2]
+        model.spot_xymin = [-args.dx / 2, -args.dy / 2]
+        model.spot_xymax = [args.dx / 2, args.dy / 2]
         if args.hex:
             model.spot_pattern_type = 'hexagonal'
         else:
@@ -166,8 +165,8 @@ def get_model_from_args(args) -> PlanInputModel:
     elif args.pattern_type == 'image':
         model.spot_shape = 'image'
         model.spot_image_path = args.image_path
-        model.spot_xymin = [-args.width / 2, -args.height / 2]
-        model.spot_xymax = [args.width / 2, args.height / 2]
+        model.spot_xymin = [-args.dx / 2, -args.dy / 2]
+        model.spot_xymax = [args.dx / 2, args.dy / 2]
 
     _apply_offset(model, args.xoffset, args.yoffset)
 
