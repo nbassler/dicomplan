@@ -15,16 +15,18 @@ class PlanInputModel:
         self.plan_operator_name = None
         self.field_treatment_machine = None
         self.field_gantry_angle = None
-        self.field_table_position = None
-        self.field_snout_position = None
+        self.field_table_position = None  # cm
+        self.field_snout_position = None  # cm
 
         self.spot_spacing = None
+
+        # position data with offsets
         # only for square patterns
-        self.spot_xymin = None
-        self.spot_xymax = None
+        self.spot_xymin = None  # cm
+        self.spot_xymax = None  # cm
         self.spot_shape = None
         # only for circular patterns
-        self.spot_diameter = None
+        self.spot_diameter = None  # cm
         self.spot_center = None
         self.spot_count = None
 

@@ -75,9 +75,9 @@ class Dicom:
                     # TODO:set table positions
                     # TODO:set snout position
 
-                icp.TableTopVerticalPosition = model.field_table_position[0]
-                icp.TableTopLongitudinalPosition = model.field_table_position[1]
-                icp.TableTopLateralPosition = model.field_table_position[2]
+                icp.TableTopVerticalPosition = model.field_table_position[0] * 10.0  # convert to mm
+                icp.TableTopLongitudinalPosition = model.field_table_position[1] * 10.0  # convert to mm
+                icp.TableTopLateralPosition = model.field_table_position[2] * 10.0  # convert to mm
 
                 icp.IsocenterPosition = [0.0, 0.0, 0.0]  # assuming iso at origin
 
