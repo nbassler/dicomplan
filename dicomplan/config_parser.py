@@ -40,7 +40,7 @@ def parse_arguments(args=None):
     parser.add_argument('-v', '--verbosity', action='count', default=0,
                         help='Give more output. Option is additive, can be used up to 3 times')
     parser.add_argument('-V', '--version', action='version',
-                        version=f'dicomfix {__version__}')
+                        version=__version__)
 
     # Subparsers for pattern types
     subparsers = parser.add_subparsers(dest="pattern_type", required=True,
