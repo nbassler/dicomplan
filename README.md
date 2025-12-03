@@ -54,11 +54,11 @@ options:
 subcommands, e.g.
 ```
 usage: main.py square [-h] [--spacing SPACING] [--mu-per-spot MU_PER_SPOT] [--energy ENERGY] [--hex] [--xoffset XOFFSET] [--yoffset YOFFSET]
-                      width height
+                      dx dy
 
 positional arguments:
-  width                 Field width [cm]
-  height                Field height [cm]
+  dx                    Field width x [cm]
+  dy                    Field height y [cm]
 
 options:
   -h, --help            show this help message and exit
