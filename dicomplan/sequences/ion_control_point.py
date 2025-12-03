@@ -33,7 +33,7 @@ def ion_control_points() -> pydicom.Dataset:
     icp.SnoutPosition = 421.0                                     # 300a,030d
     icp.MetersetRate = 100.0                                        # 300a,035a
 
-    icp.LateralSpreadingDeviceSequence = pydicom.Sequence(lateral_spreading_device())  # 300a,0370
+    icp.LateralSpreadingDeviceSettingsSequence = pydicom.Sequence(lateral_spreading_device_settings())  # 300a,0370
 
     icp.ScanSpotTuneID = '4.0'                                    # 300a,0390
 
@@ -49,7 +49,7 @@ def ion_control_points() -> pydicom.Dataset:
     # but similar to  (300B,1004) 85.00868225097656 4-byte float little endian
     # struct.unpack('<f', b'x\xaf\xaaB')  # → (85.33678436279297,)
 
-    icp.LateralSpreadingDeviceSequence = pydicom.Sequence(lateral_spreading_device())  # 300a,0370
+    icp.LateralSpreadingDeviceSequence = pydicom.Sequence(lateral_spreading_device_settings())  # 300a,0370
     icp.ReferencedDoseReferenceSequence = pydicom.Sequence(referenced_dose_reference())  # 300c,0050
 
     icps.append(icp)
@@ -91,7 +91,7 @@ def _ion_control_point_next(idx: int, empty=False, cm=0.0) -> pydicom.Dataset:
     return icp
 
 
-def lateral_spreading_device() -> list[pydicom.Dataset]:
+def lateral_spreading_device_settings() -> list[pydicom.Dataset]:
     """
     Create a LateralSpreadingDeviceSequence with a single item.
     """
