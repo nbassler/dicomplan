@@ -54,7 +54,7 @@ options:
 subcommands, e.g.
 ```
 usage: main.py square [-h] [--spacing SPACING] [--mu-per-spot MU_PER_SPOT] [--energy ENERGY] [--hex] [--xoffset XOFFSET] [--yoffset YOFFSET]
-                      width height
+                      dx dy
 
 positional arguments:
   dx                    Field width x [cm]
