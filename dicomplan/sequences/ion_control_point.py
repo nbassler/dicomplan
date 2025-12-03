@@ -92,7 +92,7 @@ def _ion_control_point_next(idx: int, empty=False, cm=0.0) -> pydicom.Dataset:
 
 def lateral_spreading_device_settings() -> list[pydicom.Dataset]:
     """
-    Create a LateralSpreadingDeviceSequence with a single item.
+    Create a LateralSpreadingDeviceSettingsSequence with a single item.
     """
 
     lsd1 = pydicom.Dataset()
