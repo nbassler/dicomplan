@@ -29,6 +29,7 @@ class PlanInputModel:
         self.spot_xymax: list[float] = [0.0, 0.0]  # cm
         self.spot_shape: Optional[str] = None
         self.trim_corners: bool = False
+        self.boost_rim: float = 1.0
 
         # only for circular patterns
         self.spot_diameter = 10.0  # cm

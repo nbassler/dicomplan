@@ -138,6 +138,10 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
         coords = np.column_stack((cx, cy)).ravel()[mask.repeat(2)]
         weights = weights[mask]
 
+    if model.boost_rim > 1.0:
+        logger.debug("Boosting rim spots by factor %s", model.boost_rim)
+        weights = _boost_rim_spots(coords, weights, model)
+
     return coords, weights
 
 
@@ -181,6 +185,11 @@ def generate_circular_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.nda
     assert len(coords) % 2 == 0, "Coordinate list must contain pairs (x, y)"
     nspots = len(coords) // 2
     weights = np.ones(nspots, dtype=np.float32)
+
+    if model.boost_rim > 1.0:
+        logger.debug("Boosting rim spots by factor %s", model.boost_rim)
+        weights = _boost_rim_spots(coords, weights, model)
+
     return coords, weights
 
 
@@ -262,6 +271,38 @@ def _flat_grid(x_coords: np.ndarray, y_coords: np.ndarray) -> np.ndarray:
     # Flatten the coordinates
     X, Y = np.meshgrid(x_coords, y_coords, indexing='ij')
     return np.column_stack((X.ravel(), Y.ravel())).ravel()
+
+
+def _boost_rim_spots(coords: np.ndarray, weights: np.ndarray, model: PlanInputModel) -> np.ndarray:
+    """
+    Boost the weights of rim spots by multiplying them by the given factor.
+    Rim spots are the outermost spots of the pattern: the leftmost and rightmost x-columns,
+    and the top/bottom spot of every x-column.
+    """
+    x_coords = coords[0::2]
+    y_coords = coords[1::2]
+    atol = (np.max(x_coords) - np.min(x_coords)) * 1e-6
+
+    unique_x = np.unique(x_coords)
+    x_min, x_max = unique_x[0], unique_x[-1]
+
+    rim_mask = np.zeros(len(weights), dtype=bool)
+
+    for x in unique_x:
+        col_mask = np.abs(x_coords - x) < atol
+        y_at_x = y_coords[col_mask]
+        if len(y_at_x) == 0:
+            continue
+        # outermost x-columns: all spots are rim spots
+        if np.abs(x - x_min) < atol or np.abs(x - x_max) < atol:
+            rim_mask |= col_mask
+        else:
+            # interior columns: only top and bottom spots
+            y_min, y_max = np.min(y_at_x), np.max(y_at_x)
+            rim_mask |= col_mask & ((np.abs(y_coords - y_min) < atol) | (np.abs(y_coords - y_max) < atol))
+
+    weights[rim_mask] *= model.boost_rim
+    return weights
 
 
 def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: np.ndarray, fwhm: list[float]) -> None:
