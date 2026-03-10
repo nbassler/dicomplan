@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 from dicomplan.model import PlanInputModel
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +24,19 @@ def generate_spot_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray
     """
     logger.debug("Generating circular pattern with model")
     if model.spot_shape == 'square':
-        return generate_square_pattern(model)
+        coords, weights = generate_square_pattern(model)
     elif model.spot_shape == 'circle':
-        return generate_circular_pattern(model)
+        coords, weights = generate_circular_pattern(model)
     elif model.spot_shape == 'image':
-        return generate_image_pattern(model)
+        coords, weights = generate_image_pattern(model)
     else:
         raise ValueError(f"Unknown spot shape: {model.spot_shape}")
+
+    if model.plot_dose:
+        logger.info(f"Generating dose plot {model.plot_dose_filepath} with FWHM {model.plot_dose_fwhm} cm")
+        _dose_plot(model.plot_dose_filepath, model, coords, weights, model.plot_dose_fwhm)
+
+    return coords, weights
 
 
 def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray]:
@@ -48,12 +55,17 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
     if model.spot_spacing is None:
         raise ValueError("spot_spacing must be defined for square pattern")
 
+    # Extract to locals - Pylance now knows these are list[float] and float
+    xymin = model.spot_xymin
+    xymax = model.spot_xymax
+    spacing = model.spot_spacing
+
     if model.spot_pattern_type == 'hexagonal':
         # in case of hexagonal pattern, we need to calculate the coordinates differently
         # every second line will be shifted by half the spacing
-        x_coords = np.arange(model.spot_xymin[0], model.spot_xymax[0], model.spot_spacing)
-        y_coords = np.arange(model.spot_xymin[1], model.spot_xymax[1], model.spot_spacing)
-        y_coords_shifted = y_coords + model.spot_spacing / 2
+        x_coords = np.arange(xymin[0], xymax[0], spacing)
+        y_coords = np.arange(xymin[1], xymax[1], spacing)
+        y_coords_shifted = y_coords + spacing / 2
         x_coords, y_coords = np.meshgrid(x_coords, y_coords)
         x_coords_shifted, y_coords_shifted = np.meshgrid(x_coords, y_coords_shifted)
         x_coords = np.concatenate((x_coords.flatten(), x_coords_shifted.flatten()))
@@ -61,28 +73,28 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
     else:
 
         # Calculate the number of spots in each direction
-        num_spots_x = int((model.spot_xymax[0] - model.spot_xymin[0]) / model.spot_spacing)
-        num_spots_y = int((model.spot_xymax[1] - model.spot_xymin[1]) / model.spot_spacing)
+        num_spots_x = int((xymax[0] - xymin[0]) / spacing)
+        num_spots_y = int((xymax[1] - xymin[1]) / spacing)
 
         logger.debug("Number of spots in x direction: %d", num_spots_x)
         logger.debug("Number of spots in y direction: %d", num_spots_y)
 
         # Create a grid of spots
-        if model.spot_spacing > 0:
+        if spacing > 0:
             # Use arange to ensure we cover the entire range with the specified spacing
             # This ensures that the last spot is included if it fits within the bounds
-            x_coords = np.arange(model.spot_xymin[0],
-                                 model.spot_xymax[0] + model.spot_spacing * 0.5,
-                                 model.spot_spacing)
-            y_coords = np.arange(model.spot_xymin[1],
-                                 model.spot_xymax[1] + model.spot_spacing * 0.5,
-                                 model.spot_spacing)
+            x_coords = np.arange(xymin[0],
+                                 xymax[0] + spacing * 0.5,
+                                 spacing)
+            y_coords = np.arange(xymin[1],
+                                 xymax[1] + spacing * 0.5,
+                                 spacing)
         else:
             # alternatively,
             # if now spot spacing was given, we can use linspace to ensure we cover the entire range
             # but then the spot spacing is changed so the corners always align with the requested rectangle
-            x_coords = np.linspace(model.spot_xymin[0], model.spot_xymax[0], num_spots_x)
-            y_coords = np.linspace(model.spot_xymin[1], model.spot_xymax[1], num_spots_y)
+            x_coords = np.linspace(xymin[0], xymax[0], num_spots_x)
+            y_coords = np.linspace(xymin[1], xymax[1], num_spots_y)
 
     coords = _flat_grid(x_coords, y_coords)
     assert len(coords) % 2 == 0, "Coordinate list must contain pairs (x, y)"
@@ -92,17 +104,17 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
     # If trim_corners is True, we need to remove the spots that are in the corners of the square
     if model.trim_corners:
         logger.debug("Trimming corners of square pattern")
-        x_coords = coords[0::2]
-        y_coords = coords[1::2]
-        mask = ~((x_coords < model.spot_xymin[0] + model.spot_spacing) &
-                 (y_coords < model.spot_xymin[1] + model.spot_spacing) |
-                 (x_coords > model.spot_xymax[0] - model.spot_spacing) &
-                 (y_coords < model.spot_xymin[1] + model.spot_spacing) |
-                 (x_coords < model.spot_xymin[0] + model.spot_spacing) &
-                 (y_coords > model.spot_xymax[1] - model.spot_spacing) |
-                 (x_coords > model.spot_xymax[0] - model.spot_spacing) &
-                 (y_coords > model.spot_xymax[1] - model.spot_spacing))
-        coords = np.column_stack((x_coords, y_coords)).ravel()[mask.repeat(2)]
+        cx: np.ndarray = coords[0::2]
+        cy: np.ndarray = coords[1::2]
+        mask = ~((cx < xymin[0] + spacing) &
+                 (cy < xymin[1] + spacing) |
+                 (cx > xymax[0] - spacing) &
+                 (cy < xymin[1] + spacing) |
+                 (cx < xymin[0] + spacing) &
+                 (cy > xymax[1] - spacing) |
+                 (cx > xymax[0] - spacing) &
+                 (cy > xymax[1] - spacing))
+        coords = np.column_stack((cx, cy)).ravel()[mask.repeat(2)]
         weights = weights[mask]
 
     return coords, weights
@@ -113,6 +125,14 @@ def generate_circular_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.nda
     Generate a circular spot pattern on a Cartesian mesh, with uniform spacing.
     Only spots inside the circle defined by model.spot_diameter and model.spot_center are kept.
     """
+
+    if model.spot_diameter is None:
+        raise ValueError("spot_diameter must be defined for circular pattern")
+    if model.spot_center is None:
+        raise ValueError("spot_center must be defined for circular pattern")
+    if model.spot_spacing is None:
+        raise ValueError("spot_spacing must be defined for circular pattern")
+
     radius = model.spot_diameter / 2
     spacing = model.spot_spacing
     cx, cy = model.spot_center
@@ -149,6 +169,13 @@ def generate_image_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarra
     """
     from PIL import Image
 
+    if model.spot_image_path is None:
+        raise ValueError("spot_image_path must be defined for image pattern")
+    if model.spot_xymin is None or model.spot_xymax is None:
+        raise ValueError("spot_xymin and spot_xymax must be defined for image pattern")
+    if model.spot_spacing is None:
+        raise ValueError("spot_spacing must be defined for image pattern")
+
     # Load image, convert to grayscale
     image = Image.open(model.spot_image_path).convert("L")  # "L" = 8-bit grayscale
     img_arr = np.array(image)
@@ -169,7 +196,7 @@ def generate_image_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarra
     logger.debug(f"Target image size: {target_width_px} x {target_height_px}")
 
     # Resize the image to match the desired resolution
-    image_resized = image.resize((target_width_px, target_height_px), Image.BILINEAR)
+    image_resized = image.resize((target_width_px, target_height_px), Image.Resampling.BILINEAR)
     img_arr = np.array(image_resized)[::-1, :]
 
     # Only keep non-zero pixels
@@ -202,7 +229,7 @@ def generate_image_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarra
     return coords, weights
 
 
-def _flat_grid(x_coords: np.ndarray, y_coords: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _flat_grid(x_coords: np.ndarray, y_coords: np.ndarray) -> np.ndarray:
     """
     Flatten the grid of coordinates into a single array.
     The coordinates are returned in the format:
@@ -214,3 +241,40 @@ def _flat_grid(x_coords: np.ndarray, y_coords: np.ndarray) -> tuple[np.ndarray, 
     # Flatten the coordinates
     X, Y = np.meshgrid(x_coords, y_coords, indexing='ij')
     return np.column_stack((X.ravel(), Y.ravel())).ravel()
+
+
+def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: np.ndarray, fwhm: list[float]) -> None:
+    '''
+    Generate a dose plot of the plan, and save it as a PNG file.
+    The dose is calculated as a sum of Gaussian functions centered at each spot, with the given
+    full width at half maximum (FWHM).
+    '''
+    # do not rely on scipy, use a gaussian from numpy
+
+    resolution = 0.01  # cm
+    x = np.arange(model.spot_xymin[0] - 1, model.spot_xymax[0] + 1, resolution)
+    y = np.arange(model.spot_xymin[1] - 1, model.spot_xymax[1] + 1, resolution)
+    X, Y = np.meshgrid(x, y, indexing='ij')
+    dose = np.zeros_like(X)
+
+    sx2 = fwhm[0]**2 / (4 * np.log(2))
+    sy2 = fwhm[1]**2 / (4 * np.log(2))
+
+    for (x0, y0), w in zip(coords.reshape(-1, 2), weights):
+        dose += w * np.exp(-(((X - x0)**2 / sx2) + ((Y - y0)**2 / sy2)))
+    # Normalize dose for visualization
+    dose /= np.max(dose)
+    plt.figure(figsize=(6, 5))
+    # use crazy discrete color map to better visualize the dose distribution
+    mycmap = plt.get_cmap('tab20', 20)  # 20 discrete colors for 5% variations in dose
+    plt.imshow(dose.T, extent=(x[0], x[-1], y[0], y[-1]), origin='lower', cmap=mycmap)
+    plt.colorbar(label='Relative Dose')
+    plt.title('Dose Distribution')
+    plt.xlabel('X (cm)')
+    plt.ylabel('Y (cm)')
+    # add black grid lines for spot positions, grid spacing every 1 cm major lines, 0.5 cm minor lines
+    plt.grid(True, which='major', color='black', linestyle='-', linewidth=0.5)
+    plt.grid(True, which='minor', color='gray', linestyle='--', linewidth=0.25)
+
+    plt.savefig(fname)
+    plt.close()

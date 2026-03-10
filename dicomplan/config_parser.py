@@ -9,6 +9,7 @@ DEFAULT_ENERGY = 120.0  # MeV
 DEFAULT_FIELD_WIDTH = 10.0  # cm
 DEFAULT_FIELD_HEIGHT = 10.0  # cm
 DEFAULT_FIELD_DIAMETER = 10.0  # cm
+DEFAULT_FWHMS = "1.000,1.000"  # cm, default FWHM for dose plot Gaussian kernel, as two values for x and y (e.g. "0.893,0.615")
 
 
 def parse_arguments(args=None):
@@ -41,6 +42,13 @@ def parse_arguments(args=None):
                         help='Give more output. Option is additive, can be used up to 3 times')
     parser.add_argument('-V', '--version', action='version',
                         version=__version__)
+    parser.add_argument('--dose_plot', action='store_true', default=False,
+                        help='Generate a dose plot of the plan')
+    parser.add_argument('--dose_plot_filepath', type=str, default="plot_dose.png",
+                        help='Filepath for dose plot image')
+    parser.add_argument('--dose_plot_fwhm', type=str, default=DEFAULT_FWHMS,
+                        help=f'FWHM (cm) for dose plot Gaussian kernel, as two values for x and y \
+                            (e.g. --dose_plot_fwhm={DEFAULT_FWHMS})')
 
     # Subparsers for pattern types
     subparsers = parser.add_subparsers(dest="pattern_type", required=True,
@@ -121,12 +129,12 @@ def get_model_from_args(args) -> PlanInputModel:
     model.field_treatment_machine = args.treatment_machine
 
     # Set the gantry angles
-    if args.gantry_angle:
+    if args.gantry_angle is not None:
         model.field_gantry_angle = args.gantry_angle
 
-    # Set the table position
-    if args.table_position:
-        model.field_table_position = [float(pos) for pos in args.table_position.split(',')]
+    if args.table_position is not None:
+        parts = [float(pos) for pos in args.table_position.split(',')]
+        model.field_table_position = [parts[0], parts[1], parts[2]]
 
     # Set the snout position
     model.field_snout_position = args.snout_position
@@ -146,8 +154,14 @@ def get_model_from_args(args) -> PlanInputModel:
     model.spot_spacing = args.spacing
     model.spot_mu = args.mu_per_spot
 
+    # set plotting options
+    model.plot_dose = args.dose_plot
+    model.plot_dose_filepath = args.dose_plot_filepath
+    model.plot_dose_fwhm = [float(fwhm) for fwhm in args.dose_plot_fwhm.split(',')]
+
     # Set the energy
-    model.spot_energy = args.energy
+    if args.energy is not None:
+        model.spot_energy = args.energy
 
     # Set the pattern type and parameters based on subparser choice
     if args.pattern_type == 'square':
@@ -180,6 +194,7 @@ def _apply_offset(model: PlanInputModel, xoffset: float, yoffset: float) -> None
     """
     Apply the offset to the model.
     """
+
     if model.spot_shape == 'circle':
         model.spot_center[0] += xoffset
         model.spot_center[1] += yoffset

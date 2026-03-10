@@ -30,7 +30,12 @@ def main(args=None):
 
     d = Dicom()
     d.apply_model(m)
+
+    if m.output_path is None:
+        logger.error("Output path is not set. Cannot write DICOM file.")
+        return 1
     d.write(m.output_path)
+
     logger.info(f"Plan written to {m.output_path}")
 
 
