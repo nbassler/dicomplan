@@ -61,15 +61,36 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
     spacing = model.spot_spacing
 
     if model.spot_pattern_type == 'hexagonal':
-        # in case of hexagonal pattern, we need to calculate the coordinates differently
-        # every second line will be shifted by half the spacing
-        x_coords = np.arange(xymin[0], xymax[0], spacing)
-        y_coords = np.arange(xymin[1], xymax[1], spacing)
-        y_coords_shifted = y_coords + spacing / 2
-        x_coords, y_coords = np.meshgrid(x_coords, y_coords)
-        x_coords_shifted, y_coords_shifted = np.meshgrid(x_coords, y_coords_shifted)
-        x_coords = np.concatenate((x_coords.flatten(), x_coords_shifted.flatten()))
-        y_coords = np.concatenate((y_coords.flatten(), y_coords_shifted.flatten()))
+        center_x = (xymin[0] + xymax[0]) / 2
+        center_y = (xymin[1] + xymax[1]) / 2
+        row_spacing = spacing * np.sqrt(3) / 2  # equidistant nearest neighbours
+
+        # Row indices centred on 0 so the pattern is symmetric around center_y; +1 guards against float truncation
+        n_rows = int((xymax[1] - xymin[1]) / 2 / row_spacing) + 1
+        row_indices = np.arange(-n_rows, n_rows + 1)
+
+        # Column indices centred on 0; +1 ensures boundary spots aren't missed due to float truncation
+        n_cols = int((xymax[0] - xymin[0]) / 2 / spacing) + 1
+
+        eps = spacing * 1e-6  # float tolerance for boundary inclusion
+        all_x = []
+        all_y = []
+        for k in row_indices:
+            yi = center_y + k * row_spacing
+            if yi < xymin[1] - eps or yi > xymax[1] + eps:  # clip rows outside y bounds
+                continue
+            if k % 2 == 0:
+                row_x = center_x + np.arange(-n_cols, n_cols + 1) * spacing
+            else:
+                row_x = center_x + (np.arange(-n_cols, n_cols + 1) + 0.5) * spacing
+            # clip to x bounding box
+            row_x = row_x[(row_x >= xymin[0] - eps) & (row_x <= xymax[0] + eps)]
+            all_x.append(row_x)
+            all_y.append(np.full_like(row_x, yi))
+
+        x_coords = np.concatenate(all_x)
+        y_coords = np.concatenate(all_y)
+        coords = np.column_stack((x_coords, y_coords)).ravel()
     else:
 
         # Calculate the number of spots in each direction
@@ -96,7 +117,7 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
             x_coords = np.linspace(xymin[0], xymax[0], num_spots_x)
             y_coords = np.linspace(xymin[1], xymax[1], num_spots_y)
 
-    coords = _flat_grid(x_coords, y_coords)
+        coords = _flat_grid(x_coords, y_coords)
     assert len(coords) % 2 == 0, "Coordinate list must contain pairs (x, y)"
     nspots = len(coords) // 2
     weights = np.ones(nspots, dtype=np.float32)
