@@ -279,6 +279,9 @@ def _boost_rim_spots(coords: np.ndarray, weights: np.ndarray, model: PlanInputMo
     Rim spots are the outermost spots of the pattern: the leftmost and rightmost x-columns,
     and the top/bottom spot of every x-column.
     """
+
+    logger.info("Boosting rim spots by factor %s", model.boost_rim)
+
     x_coords = coords[0::2]
     y_coords = coords[1::2]
     atol = (np.max(x_coords) - np.min(x_coords)) * 1e-6
