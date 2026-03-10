@@ -63,6 +63,8 @@ def parse_arguments(args=None):
                         help='X offset [cm]')
     square.add_argument('--yoffset', type=float, default=0.0,
                         help='Y offset [cm]')
+    square.add_argument('--trim_corners', action='store_true', default=False,
+                        help='Trim corners of square pattern.')
 
     # Circle pattern
     circle = subparsers.add_parser('circle', help='Generate a circular spot pattern')
@@ -152,6 +154,7 @@ def get_model_from_args(args) -> PlanInputModel:
         model.spot_shape = 'square'
         model.spot_xymin = [-args.dx / 2, -args.dy / 2]
         model.spot_xymax = [args.dx / 2, args.dy / 2]
+        model.trim_corners = args.trim_corners
         if args.hex:
             model.spot_pattern_type = 'hexagonal'
         else:

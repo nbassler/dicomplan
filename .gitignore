@@ -1,4 +1,4 @@
-dicomplan/__version__.py
+__version__.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -25,6 +25,8 @@ class PlanInputModel:
         self.spot_xymin = None  # cm
         self.spot_xymax = None  # cm
         self.spot_shape = None
+        self.trim_corners = False
+
         # only for circular patterns
         self.spot_diameter = None  # cm
         self.spot_center = None

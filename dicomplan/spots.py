@@ -43,6 +43,11 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
 
     logger.debug("Generating square pattern with spot spacing %s cm", model.spot_spacing)
 
+    if model.spot_xymin is None or model.spot_xymax is None:
+        raise ValueError("spot_xymin and spot_xymax must be defined for square pattern")
+    if model.spot_spacing is None:
+        raise ValueError("spot_spacing must be defined for square pattern")
+
     if model.spot_pattern_type == 'hexagonal':
         # in case of hexagonal pattern, we need to calculate the coordinates differently
         # every second line will be shifted by half the spacing
@@ -83,6 +88,22 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
     assert len(coords) % 2 == 0, "Coordinate list must contain pairs (x, y)"
     nspots = len(coords) // 2
     weights = np.ones(nspots, dtype=np.float32)
+
+    # If trim_corners is True, we need to remove the spots that are in the corners of the square
+    if model.trim_corners:
+        logger.debug("Trimming corners of square pattern")
+        x_coords = coords[0::2]
+        y_coords = coords[1::2]
+        mask = ~((x_coords < model.spot_xymin[0] + model.spot_spacing) &
+                 (y_coords < model.spot_xymin[1] + model.spot_spacing) |
+                 (x_coords > model.spot_xymax[0] - model.spot_spacing) &
+                 (y_coords < model.spot_xymin[1] + model.spot_spacing) |
+                 (x_coords < model.spot_xymin[0] + model.spot_spacing) &
+                 (y_coords > model.spot_xymax[1] - model.spot_spacing) |
+                 (x_coords > model.spot_xymax[0] - model.spot_spacing) &
+                 (y_coords > model.spot_xymax[1] - model.spot_spacing))
+        coords = np.column_stack((x_coords, y_coords)).ravel()[mask.repeat(2)]
+        weights = weights[mask]
 
     return coords, weights
 
