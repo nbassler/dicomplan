@@ -311,7 +311,6 @@ def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: n
     The dose is calculated as a sum of Gaussian functions centered at each spot, with the given
     full width at half maximum (FWHM).
     '''
-    # do not rely on scipy, use a gaussian from numpy
 
     resolution = 0.01  # cm
     x = np.arange(model.spot_xymin[0] - 1, model.spot_xymax[0] + 1, resolution)
@@ -331,12 +330,18 @@ def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: n
     mycmap = plt.get_cmap('tab20', 20)  # 20 discrete colors for 5% variations in dose
     plt.imshow(dose.T, extent=(x[0], x[-1], y[0], y[-1]), origin='lower', cmap=mycmap)
     plt.colorbar(label='Relative Dose')
-    plt.title('Dose Distribution')
+    plt.title(f'Dose Distribution {model.output_path}')
     plt.xlabel('X (cm)')
     plt.ylabel('Y (cm)')
-    # add black grid lines for spot positions, grid spacing every 1 cm major lines, 0.5 cm minor lines
-    plt.grid(True, which='major', color='black', linestyle='-', linewidth=0.5)
-    plt.grid(True, which='minor', color='gray', linestyle='--', linewidth=0.25)
+    # add grid lines: 1 cm major, 0.5 cm minor
+    ax = plt.gca()
+    from matplotlib.ticker import MultipleLocator
+    ax.xaxis.set_major_locator(MultipleLocator(1.0))
+    ax.yaxis.set_major_locator(MultipleLocator(1.0))
+    ax.xaxis.set_minor_locator(MultipleLocator(0.5))
+    ax.yaxis.set_minor_locator(MultipleLocator(0.5))
+    ax.grid(True, which='major', color='black', linestyle='-', linewidth=0.5)
+    ax.grid(True, which='minor', color='gray', linestyle='--', linewidth=0.25)
 
     plt.savefig(fname)
     plt.close()
