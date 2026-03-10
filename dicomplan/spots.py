@@ -138,6 +138,10 @@ def generate_square_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarr
         coords = np.column_stack((cx, cy)).ravel()[mask.repeat(2)]
         weights = weights[mask]
 
+    if model.boost_rim > 1.0:
+        logger.debug("Boosting rim spots by factor %s", model.boost_rim)
+        weights = _boost_rim_spots(coords, weights, model)
+
     return coords, weights
 
 
@@ -181,6 +185,11 @@ def generate_circular_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.nda
     assert len(coords) % 2 == 0, "Coordinate list must contain pairs (x, y)"
     nspots = len(coords) // 2
     weights = np.ones(nspots, dtype=np.float32)
+
+    if model.boost_rim > 1.0:
+        logger.debug("Boosting rim spots by factor %s", model.boost_rim)
+        weights = _boost_rim_spots(coords, weights, model)
+
     return coords, weights
 
 
@@ -264,13 +273,47 @@ def _flat_grid(x_coords: np.ndarray, y_coords: np.ndarray) -> np.ndarray:
     return np.column_stack((X.ravel(), Y.ravel())).ravel()
 
 
+def _boost_rim_spots(coords: np.ndarray, weights: np.ndarray, model: PlanInputModel) -> np.ndarray:
+    """
+    Boost the weights of rim spots by multiplying them by the given factor.
+    Rim spots are the outermost spots of the pattern: the leftmost and rightmost x-columns,
+    and the top/bottom spot of every x-column.
+    """
+
+    logger.info("Boosting rim spots by factor %s", model.boost_rim)
+
+    x_coords = coords[0::2]
+    y_coords = coords[1::2]
+    atol = (np.max(x_coords) - np.min(x_coords)) * 1e-6
+
+    unique_x = np.unique(x_coords)
+    x_min, x_max = unique_x[0], unique_x[-1]
+
+    rim_mask = np.zeros(len(weights), dtype=bool)
+
+    for x in unique_x:
+        col_mask = np.abs(x_coords - x) < atol
+        y_at_x = y_coords[col_mask]
+        if len(y_at_x) == 0:
+            continue
+        # outermost x-columns: all spots are rim spots
+        if np.abs(x - x_min) < atol or np.abs(x - x_max) < atol:
+            rim_mask |= col_mask
+        else:
+            # interior columns: only top and bottom spots
+            y_min, y_max = np.min(y_at_x), np.max(y_at_x)
+            rim_mask |= col_mask & ((np.abs(y_coords - y_min) < atol) | (np.abs(y_coords - y_max) < atol))
+
+    weights[rim_mask] *= model.boost_rim
+    return weights
+
+
 def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: np.ndarray, fwhm: list[float]) -> None:
     '''
     Generate a dose plot of the plan, and save it as a PNG file.
     The dose is calculated as a sum of Gaussian functions centered at each spot, with the given
     full width at half maximum (FWHM).
     '''
-    # do not rely on scipy, use a gaussian from numpy
 
     resolution = 0.01  # cm
     x = np.arange(model.spot_xymin[0] - 1, model.spot_xymax[0] + 1, resolution)
@@ -290,12 +333,18 @@ def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: n
     mycmap = plt.get_cmap('tab20', 20)  # 20 discrete colors for 5% variations in dose
     plt.imshow(dose.T, extent=(x[0], x[-1], y[0], y[-1]), origin='lower', cmap=mycmap)
     plt.colorbar(label='Relative Dose')
-    plt.title('Dose Distribution')
+    plt.title(f'Dose Distribution {model.output_path}')
     plt.xlabel('X (cm)')
     plt.ylabel('Y (cm)')
-    # add black grid lines for spot positions, grid spacing every 1 cm major lines, 0.5 cm minor lines
-    plt.grid(True, which='major', color='black', linestyle='-', linewidth=0.5)
-    plt.grid(True, which='minor', color='gray', linestyle='--', linewidth=0.25)
+    # add grid lines: 1 cm major, 0.5 cm minor
+    ax = plt.gca()
+    from matplotlib.ticker import MultipleLocator
+    ax.xaxis.set_major_locator(MultipleLocator(1.0))
+    ax.yaxis.set_major_locator(MultipleLocator(1.0))
+    ax.xaxis.set_minor_locator(MultipleLocator(0.5))
+    ax.yaxis.set_minor_locator(MultipleLocator(0.5))
+    ax.grid(True, which='major', color='black', linestyle='-', linewidth=0.5)
+    ax.grid(True, which='minor', color='gray', linestyle='--', linewidth=0.25)
 
     plt.savefig(fname)
     plt.close()

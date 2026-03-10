@@ -73,6 +73,8 @@ def parse_arguments(args=None):
                         help='Y offset [cm]')
     square.add_argument('--trim_corners', action='store_true', default=False,
                         help='Trim corners of square pattern.')
+    square.add_argument('--boost_rim', type=float, default=1.0,
+                        help='Boost rim spots by multiplying their MU by this factor.')
 
     # Circle pattern
     circle = subparsers.add_parser('circle', help='Generate a circular spot pattern')
@@ -87,6 +89,8 @@ def parse_arguments(args=None):
                         help='X offset [cm]')
     circle.add_argument('--yoffset', type=float, default=0.0,
                         help='Y offset [cm]')
+    circle.add_argument('--boost_rim', type=float, default=1.0,
+                        help='Boost rim spots by multiplying their MU by this factor.')
 
     # Image pattern
     image = subparsers.add_parser('image', help='Generate a spot pattern from image')
@@ -162,6 +166,9 @@ def get_model_from_args(args) -> PlanInputModel:
     # Set the energy
     if args.energy is not None:
         model.spot_energy = args.energy
+
+    if args.boost_rim > 1.0:
+        model.boost_rim = args.boost_rim
 
     # Set the pattern type and parameters based on subparser choice
     if args.pattern_type == 'square':
