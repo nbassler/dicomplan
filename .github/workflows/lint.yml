@@ -6,7 +6,7 @@ on:
     branches: [ main ]
 
 jobs:
-  flake8:
+  ruff:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
