@@ -167,7 +167,7 @@ def get_model_from_args(args) -> PlanInputModel:
     if args.energy is not None:
         model.spot_energy = args.energy
 
-    if args.boost_rim > 1.0:
+    if getattr(args, 'boost_rim', 1.0) > 1.0:
         model.boost_rim = args.boost_rim
 
     # Set the pattern type and parameters based on subparser choice
@@ -189,8 +189,8 @@ def get_model_from_args(args) -> PlanInputModel:
     elif args.pattern_type == 'image':
         model.spot_shape = 'image'
         model.spot_image_path = args.image_path
-        model.spot_xymin = [-args.dx / 2, -args.dy / 2]
-        model.spot_xymax = [args.dx / 2, args.dy / 2]
+        model.spot_xymin = [-args.width / 2, -args.height / 2]
+        model.spot_xymax = [args.width / 2, args.height / 2]
 
     _apply_offset(model, args.xoffset, args.yoffset)
 

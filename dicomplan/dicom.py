@@ -6,11 +6,11 @@ import logging
 import xml.etree.ElementTree as ET
 import numpy as np
 
-from sequences.dose_reference import dose_reference
-from sequences.fraction_group import fraction_group
-from sequences.patient_setup import patient_setup
-from sequences.ion_tolerance_table import ion_tolerance_table
-from sequences.ion_beam import ion_beam
+from dicomplan.sequences.dose_reference import dose_reference
+from dicomplan.sequences.fraction_group import fraction_group
+from dicomplan.sequences.patient_setup import patient_setup
+from dicomplan.sequences.ion_tolerance_table import ion_tolerance_table
+from dicomplan.sequences.ion_beam import ion_beam
 from dicomplan.spots import generate_spot_pattern
 
 

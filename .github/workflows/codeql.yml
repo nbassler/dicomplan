@@ -1,0 +1,33 @@
+name: "CodeQL"
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write   # <-- required to upload results to code scanning
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python' ]  # add more if needed
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      # Python usually needs no build. If you have a build step, add it here.
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3

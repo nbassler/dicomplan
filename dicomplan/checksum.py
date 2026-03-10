@@ -2,7 +2,6 @@ import sys
 import hashlib
 import pydicom
 import xml.etree.ElementTree as ET
-from io import BytesIO
 from pydicom.filebase import DicomBytesIO
 from pydicom.filewriter import write_dataset
 from pydicom.tag import Tag
