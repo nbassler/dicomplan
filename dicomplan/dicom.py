@@ -1,5 +1,5 @@
 import pydicom
-from pydicom.uid import ImplicitVRLittleEndian
+from pydicom.uid import ImplicitVRLittleEndian, PYDICOM_IMPLEMENTATION_UID
 
 import datetime
 import logging
@@ -101,11 +101,11 @@ class Dicom:
         Write the DICOM dataset to a file.
         """
         # Set required file meta
-        self.ds.file_meta = pydicom.Dataset()
+        self.ds.file_meta = pydicom.FileMetaDataset()
         self.ds.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian
         self.ds.file_meta.MediaStorageSOPClassUID = self.ds.SOPClassUID
         self.ds.file_meta.MediaStorageSOPInstanceUID = self.ds.SOPInstanceUID
-        self.ds.file_meta.ImplementationClassUID = pydicom.uid.PYDICOM_IMPLEMENTATION_UID
+        self.ds.file_meta.ImplementationClassUID = PYDICOM_IMPLEMENTATION_UID
 
         # Save using the correct flags
         pydicom.dcmwrite(

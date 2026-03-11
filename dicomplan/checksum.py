@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from pydicom.filebase import DicomBytesIO
 from pydicom.filewriter import write_dataset
 from pydicom.tag import Tag
+from pydicom.uid import ImplicitVRLittleEndian
 
 # This script was just various snippets to test the idea whether the XML stream defined what to hash.
 
@@ -82,7 +83,7 @@ def extract_referenced_structures(ds, refs):
 
 def calculate_md5(dataset):
     fp = DicomBytesIO()
-    fp.is_implicit_VR = (dataset.file_meta.TransferSyntaxUID == pydicom.uid.ImplicitVRLittleEndian)
+    fp.is_implicit_VR = (dataset.file_meta.TransferSyntaxUID == ImplicitVRLittleEndian)
     fp.is_little_endian = True
     write_dataset(fp, dataset)
     return hashlib.md5(fp.getvalue()).hexdigest().upper()
