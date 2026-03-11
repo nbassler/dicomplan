@@ -1,7 +1,7 @@
 import pydicom
 
 
-def ion_control_points() -> pydicom.Dataset:
+def ion_control_points() -> pydicom.Sequence:
     """
     Create an IonControlPointSequence with at least two items.
     """
@@ -22,7 +22,7 @@ def ion_control_points() -> pydicom.Dataset:
     icp.TableTopLateralPosition = 0.0                             # 300a,012a
     icp.IsocenterPosition = [0.0, 0.0, 0.0]                       # 300a,012c
 
-    icp.CumulativeMetersetWeight = 0                             # 300a,0134
+    icp.CumulativeMetersetWeight = 0.0                           # 300a,0134
 
     icp.TableTopPitchAngle = 0.0                                  # 300a,0140
     icp.TableTopPitchRotationDirection = 'NONE'                   # 300a,0142
@@ -53,11 +53,8 @@ def ion_control_points() -> pydicom.Dataset:
 
     icps.append(icp)
 
-    # check if icpScanSpotMetersetWeights is iterable, and if it is, find the sum:
-    if hasattr(icp.ScanSpotMetersetWeights, '__iter__'):
-        cm = sum(icp.ScanSpotMetersetWeights)
-    else:
-        cm = icp.ScanSpotMetersetWeights
+    weights = icp.ScanSpotMetersetWeights
+    cm: float = sum(weights) if isinstance(weights, list) else float(weights)
 
     new_cummulative_meterset_weight = icp.CumulativeMetersetWeight + cm
     icps.append(_ion_control_point_next(1, empty=True, cm=new_cummulative_meterset_weight))
