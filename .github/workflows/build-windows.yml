@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Binaries
 
 on:
   release:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     permissions:
       contents: write
@@ -36,3 +36,38 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: dist/dicomplan.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # needed for setuptools-scm versioning
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install pyinstaller
+        python -m pip install .
+
+    - name: Build binary
+      run: |
+        pyinstaller --onefile --name dicomplan dicomplan/main.py
+
+    - name: Archive Linux binary
+      run: |
+        tar -C dist -czf dist/dicomplan-linux-x86_64.tar.gz dicomplan
+
+    - name: Upload binary to release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/dicomplan-linux-x86_64.tar.gz
