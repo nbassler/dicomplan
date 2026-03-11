@@ -62,8 +62,12 @@ jobs:
       run: |
         pyinstaller --onefile --name dicomplan dicomplan/main.py
 
+    - name: Archive Linux binary
+      run: |
+        tar -C dist -czf dist/dicomplan-linux-x86_64.tar.gz dicomplan
+
     - name: Upload binary to release
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/dicomplan
+        files: dist/dicomplan-linux-x86_64.tar.gz
