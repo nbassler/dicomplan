@@ -1,9 +1,6 @@
 name: Build Windows EXE
 
 on:
-  push:
-    branches:
-      - 17-add-windows-installer
   release:
     types: [published]
   workflow_dispatch:
@@ -35,6 +32,7 @@ jobs:
         pyinstaller --onefile --name dicomplan dicomplan/main.py
 
     - name: Upload EXE to release
+      if: github.event_name == 'release'
       uses: softprops/action-gh-release@v2
       with:
         files: dist/dicomplan.exe
