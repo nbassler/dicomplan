@@ -1,6 +1,9 @@
 name: Build Windows EXE
 
 on:
+  push:
+    branches:
+      - 17-add-windows-installer
   release:
     types: [published]
   workflow_dispatch:
