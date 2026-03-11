@@ -30,3 +30,26 @@ jobs:
     - name: Run tests
       run: |
         pytest --maxfail=2 --disable-warnings
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install pyinstaller
+        python -m pip install .
+
+    - name: Build EXE
+      run: |
+        pyinstaller --onefile --name dicomplan dicomplan/main.py
