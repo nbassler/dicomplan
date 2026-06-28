@@ -72,8 +72,7 @@ class Dicom:
                 icp.NominalBeamEnergy = model.spot_energy
                 if cp_idx == 0:
                     icp.GantryAngle = model.field_gantry_angle
-                    # TODO:set table positions
-                    # TODO:set snout position
+                    icp.SnoutPosition = model.field_snout_position * 10.0  # convert cm to mm
 
                 icp.TableTopVerticalPosition = model.field_table_position[0] * 10.0  # convert to mm
                 icp.TableTopLongitudinalPosition = model.field_table_position[1] * 10.0  # convert to mm
