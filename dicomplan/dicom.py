@@ -40,7 +40,9 @@ class Dicom:
         self.ds.StudyDate = now.strftime('%Y%m%d')
         self.ds.StudyTime = now.strftime('%H%M%S.%f')[:-3]
 
-        # get the spot pattern
+        # get the spot pattern: coords are (x,y) pairs, weights are per-spot relative intensities.
+        # For a plain pattern, weights are all 1.0. If --boost_rim is set, rim spot weights are
+        # multiplied by the boost factor inside generate_spot_pattern before returning here.
         coords, weights = generate_spot_pattern(model)
         nspots = len(coords) // 2  # total number of spots
         zero_weights = np.zeros(nspots)
@@ -50,15 +52,16 @@ class Dicom:
         if len(coords) != 2 * nspots:
             raise ValueError(f"coords length {len(coords)} is not equal to 2*nspots {2 * nspots}")
 
-        # set total plan MU. For now there is only a single energy layer.
-        total_mus = nspots * model.spot_mu
+        # Scale relative weights to absolute MU values. Center spots become spot_mu MU each;
+        # rim spots are already boosted (weight > 1.0), so they get boost_rim * spot_mu MU each.
+        weights *= model.spot_mu
+        # BeamMeterset must equal FinalCumulativeMetersetWeight, so derive it from the actual
+        # sum rather than nspots * spot_mu, which would be wrong when rim is boosted.
+        total_mus = float(np.sum(weights))
         self.ds.FractionGroupSequence[0].ReferencedBeamSequence[0].BeamMeterset = total_mus
         logger.info(f"total MU: {total_mus}")
 
         cum_weight = 0.0
-
-        # temporary for tests
-        weights *= 40.0
 
         coords_mm = coords * 10.0  # convert to mm
 
@@ -71,6 +74,7 @@ class Dicom:
                 icp.ControlPointIndex = cp_idx
                 icp.NominalBeamEnergy = model.spot_energy
                 if cp_idx == 0:
+                    # geometry tags only required on the first control point
                     icp.GantryAngle = model.field_gantry_angle
                     icp.SnoutPosition = model.field_snout_position * 10.0  # convert cm to mm
 
@@ -80,19 +84,19 @@ class Dicom:
 
                 icp.IsocenterPosition = [0.0, 0.0, 0.0]  # assuming iso at origin
 
-                icp.CumulativeMetersetWeight = cum_weight  # value before spots are delivered
+                icp.CumulativeMetersetWeight = cum_weight  # cumulative MU delivered before this CP
 
                 icp.NumberOfScanSpotPositions = nspots  # TODO: multiple layer handling.
                 icp.ScanSpotPositionMap = coords_mm.tolist()
 
-                # if control point index is even, fill weights, otherwise set to 0
+                # DICOM RT Ion uses pairs of control points per energy layer: the even CP carries
+                # the actual spot weights; the odd CP is a zero-weight terminator.
                 if icp.ControlPointIndex % 2 == 0:
                     icp.ScanSpotMetersetWeights = weights.tolist()
-                    # we will let the cumulative weight range from 0 to 1.
                     cum_weight += sum(weights)
                 else:
                     icp.ScanSpotMetersetWeights = zero_weights.tolist()
-            ib.FinalCumulativeMetersetWeight = cum_weight
+            ib.FinalCumulativeMetersetWeight = cum_weight  # must equal BeamMeterset
             logger.debug(f"apply_model() - FinalCumulativeMetersetWeight: {cum_weight}")
 
     def write(self, filename: str):
