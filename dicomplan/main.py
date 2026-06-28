@@ -20,13 +20,22 @@ def main(args=None):
     # Populate the model from the parsed arguments
     m = get_model_from_args(parsed_args)
 
-    # Configure root logger at WARNING so third-party libraries (matplotlib etc.) stay quiet.
-    # Verbosity flags only raise the level for our own package logger.
+    # Root logger stays at WARNING so third-party libraries (matplotlib etc.) stay quiet.
     logging.basicConfig(level=logging.WARNING)
+
+    # Give the dicomplan logger its own handler and disable propagation so its records
+    # never reach the root handler's WARNING gate, allowing -v/-vv to work correctly.
+    pkg_logger = logging.getLogger('dicomplan')
+    pkg_handler = logging.StreamHandler()
+    pkg_handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
+    pkg_logger.addHandler(pkg_handler)
+    pkg_logger.propagate = False
     if parsed_args.verbosity == 1:
-        logging.getLogger('dicomplan').setLevel(logging.INFO)
+        pkg_logger.setLevel(logging.INFO)
     elif parsed_args.verbosity > 1:
-        logging.getLogger('dicomplan').setLevel(logging.DEBUG)
+        pkg_logger.setLevel(logging.DEBUG)
+    else:
+        pkg_logger.setLevel(logging.WARNING)
 
     d = Dicom()
     d.apply_model(m)
