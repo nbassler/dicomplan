@@ -1,7 +1,21 @@
 import argparse
-from dicomplan.__version__ import __version__
+import subprocess
+from dicomplan.__version__ import __version__, __commit_id__
 
 from dicomplan.model import PlanInputModel
+
+
+def _version_string() -> str:
+    try:
+        result = subprocess.run(
+            ['git', 'describe', '--tags', '--dirty'],
+            capture_output=True, text=True, timeout=2
+        )
+        if result.returncode == 0:
+            return f"dicomplan {result.stdout.strip()}"
+    except Exception:
+        pass
+    return f"dicomplan {__version__} ({__commit_id__})"
 
 DEFAULT_SPOT_SPACING = 0.5  # cm
 DEFAULT_MU_PER_SPOT = 10.0  # MU
@@ -41,7 +55,7 @@ def parse_arguments(args=None):
     parser.add_argument('-v', '--verbosity', action='count', default=0,
                         help='Give more output. Option is additive, can be used up to 3 times')
     parser.add_argument('-V', '--version', action='version',
-                        version=__version__)
+                        version=_version_string())
     parser.add_argument('--dose_plot', action='store_true', default=False,
                         help='Generate a dose plot of the plan')
     parser.add_argument('--dose_plot_filepath', type=str, default="plot_dose.png",
