@@ -1,14 +1,8 @@
 [build-system]
-requires = ["setuptools>=42", "wheel", "setuptools-scm"]
+requires = ["setuptools>=64", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-dependencies = [
-    "pydicom>=2.3.1",
-    "numpy>=1.23.5",
-    "Pillow>=9.5.0",
-    "matplotlib>=3.7.1",
-]
 name = "dicomplan"
 description = "Create simple DICOM plan for proton therapy facilities."
 authors = [
@@ -17,7 +11,19 @@ authors = [
 license = { text = "MIT" }
 readme = "README.md"
 dynamic = ["version"]
+requires-python = ">=3.11"
 keywords = ["dicom", "RTPLAN", "radiotherapy"]
+dependencies = [
+    "pydicom>=2.3.1",
+    "numpy>=1.23.5",
+    "Pillow>=9.5.0",
+    "matplotlib>=3.7.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/nbassler/dicomplan"
+Repository = "https://github.com/nbassler/dicomplan"
+Issues = "https://github.com/nbassler/dicomplan/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -49,4 +55,4 @@ column_limit = 127
 [tool.setuptools_scm]
 version_scheme = "post-release"
 local_scheme = "node-and-date"
-write_to = "dicomplan/__version__.py"
+version_file = "dicomplan/__version__.py"
