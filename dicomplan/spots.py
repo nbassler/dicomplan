@@ -29,6 +29,8 @@ def generate_spot_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray
         coords, weights = generate_circular_pattern(model)
     elif model.spot_shape == 'image':
         coords, weights = generate_image_pattern(model)
+    elif model.spot_shape == 'csv':
+        coords, weights = generate_csv_pattern(model)
     else:
         raise ValueError(f"Unknown spot shape: {model.spot_shape}")
 
@@ -255,6 +257,33 @@ def generate_image_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarra
     y_coords = y_coords[keep_mask]
 
     coords = np.column_stack((x_coords, y_coords)).ravel()
+
+    return coords, weights
+
+
+def generate_csv_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Generate a spot pattern based on a CSV file.
+    The CSV file should have two columns: x and y coordinates of the spots in cm.
+    """
+    import pandas as pd
+
+    if model.spot_csv_path is None:
+        raise ValueError("spot_csv_path must be defined for csv pattern")
+
+    # Load CSV
+    df = pd.read_csv(model.spot_csv_path)
+
+    if 'x' not in df.columns or 'y' not in df.columns:
+        raise ValueError("CSV file must contain 'x' and 'y' columns")
+    if 'mu' not in df.columns:
+        raise ValueError("CSV file must contain 'mu' column for spot weights")
+
+    x_coords = df['x'].values
+    y_coords = df['y'].values
+
+    coords = np.column_stack((x_coords, y_coords)).ravel()
+    weights = df['mu'].values.astype(np.float32)
 
     return coords, weights
 

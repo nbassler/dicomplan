@@ -26,6 +26,7 @@ dicomplan [options] {square,circle,image} ...
 | `square` | `dx dy` | Rectangular field, `dx` × `dy` cm |
 | `circle` | `diameter` | Circular field with given diameter in cm |
 | `image` | `width height file.png` | Field shaped by a grayscale PNG image |
+| `csv` | `file.csv` | Field described by a csv spotlist with x, y and MU
 
 ### Global options
 
@@ -88,6 +89,11 @@ dicomplan -o hex.dcm -g 270 -sp 30.0 square 8 8 --hex --spacing 0.5 --mu-per-spo
 Generate a dose preview plot alongside the DICOM file:
 ```bash
 dicomplan -o plan.dcm square 10 10 --energy 120 --mu-per-spot 20 --dose_plot
+```
+
+Use a csv spotlist file with pre-defined (X, Y) spots with given MU values
+```bash
+dicomplan -o plan.dcm csv spotlist.csv --energy 120
 ```
 
 ## License

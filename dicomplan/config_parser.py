@@ -127,6 +127,21 @@ def parse_arguments(args=None):
     image.add_argument('--yoffset', type=float, default=0.0,
                        help='Y offset [cm]')
 
+    # CSV spotlist pattern
+    # Arguments "spacing", "mu-per-spot", "xoffset" and "yoffset" are not used for CSV pattern, but are included for consistency with other patterns.
+    csv = subparsers.add_parser('csv', help='Generate a spot pattern from CSV')
+    csv.add_argument('csv_path', type=str, help='Path to CSV file with spot positions')
+    csv.add_argument('--spacing', type=float, default=DEFAULT_SPOT_SPACING,
+                       help='Spot spacing [cm]')
+    csv.add_argument('--mu-per-spot', type=float, default=DEFAULT_MU_PER_SPOT,
+                       help='Average amount of MU per spot')
+    csv.add_argument('--energy', type=float, default=DEFAULT_ENERGY,
+                       help='Beam energy [MeV]')
+    csv.add_argument('--xoffset', type=float, default=0.0,
+                       help='X offset [cm]')
+    csv.add_argument('--yoffset', type=float, default=0.0,
+                       help='Y offset [cm]')
+
     return parser.parse_args(args)
 
 
@@ -205,6 +220,10 @@ def get_model_from_args(args) -> PlanInputModel:
         model.spot_image_path = args.image_path
         model.spot_xymin = [-args.width / 2, -args.height / 2]
         model.spot_xymax = [args.width / 2, args.height / 2]
+
+    elif args.pattern_type == 'csv':
+        model.spot_shape = 'csv'
+        model.spot_csv_path = args.csv_path
 
     _apply_offset(model, args.xoffset, args.yoffset)
 

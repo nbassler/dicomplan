@@ -44,6 +44,8 @@ class PlanInputModel:
         # in case of user loads a png image, this will be the path to the image
         self.spot_image_path: Optional[str] = None
 
+        self.spot_csv_path: Optional[str] = None  # path to csv file with spot positions
+
         self.plot_dose: bool = False
 
         # sigma to fwhm conversion: fwhm = 2.355 * sigma
