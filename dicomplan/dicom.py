@@ -3,6 +3,7 @@ from pydicom.uid import ImplicitVRLittleEndian, PYDICOM_IMPLEMENTATION_UID
 
 import datetime
 import logging
+import math
 import xml.etree.ElementTree as ET
 import numpy as np
 
@@ -11,7 +12,8 @@ from dicomplan.sequences.fraction_group import fraction_group
 from dicomplan.sequences.patient_setup import patient_setup
 from dicomplan.sequences.ion_tolerance_table import ion_tolerance_table
 from dicomplan.sequences.ion_beam import ion_beam
-from dicomplan.spots import generate_spot_pattern
+from dicomplan.sequences.ion_control_point import ion_control_points
+from dicomplan.spots import generate_spot_layers
 
 
 logger = logging.getLogger(__name__)
@@ -40,71 +42,91 @@ class Dicom:
         self.ds.StudyDate = now.strftime('%Y%m%d')
         self.ds.StudyTime = now.strftime('%H%M%S.%f')[:-3]
 
-        # get the spot pattern: coords are (x,y) pairs, weights are per-spot relative intensities
+        # Get the energy layers of the plan. Every layer becomes one pair of control points.
+        # Within a layer, coords are (x,y) pairs and weights are per-spot relative intensities
         # unless the model declares them as absolute MU values, as CSV spot lists do.
         # For a plain pattern, weights are all 1.0. If --boost_rim is set, rim spot weights are
         # multiplied by the boost factor inside generate_spot_pattern before returning here.
-        coords, weights = generate_spot_pattern(model)
-        nspots = len(coords) // 2  # total number of spots
-        zero_weights = np.zeros(nspots, dtype=np.float32)
-        logger.info(f"number of spots: {nspots}")
+        layers = generate_spot_layers(model)
+        logger.info(f"number of spots: {sum(layer.nspots for layer in layers)}")
 
-        # check if coords length is exactly 2*nspots
-        if len(coords) != 2 * nspots:
-            raise ValueError(f"coords length {len(coords)} is not equal to 2*nspots {2 * nspots}")
+        for layer in layers:
+            if len(layer.coords) != 2 * layer.nspots:
+                raise ValueError(f"coords length {len(layer.coords)} is not equal to 2*nspots {2 * layer.nspots}")
 
         # Scale relative weights to absolute MU values. Center spots become spot_mu MU each;
         # rim spots are already boosted (weight > 1.0), so they get boost_rim * spot_mu MU each.
-        if model.spot_weights_are_absolute_mu:
-            spot_mus = weights.astype(np.float32, copy=False)
-        else:
-            if model.spot_mu is None:
-                raise ValueError("spot_mu must be defined when spot weights are relative")
-            spot_mus = weights * model.spot_mu
+        layer_mus = [self._absolute_mus(model, layer.weights) for layer in layers]
 
         # BeamMeterset must equal FinalCumulativeMetersetWeight, so derive it from the actual
         # sum rather than nspots * spot_mu, which would be wrong when rim is boosted.
-        total_mus = float(np.sum(spot_mus))
+        # Each layer sum is widened to float64 before accumulating: summing the float32 layer
+        # totals directly keeps the running total in float32, whose ~2e-3 resolution at 3e4 MU
+        # is enough to drift away from the float64 cum_weight built up in the loop below.
+        total_mus = math.fsum(float(np.sum(mus)) for mus in layer_mus)
         self.ds.FractionGroupSequence[0].ReferencedBeamSequence[0].BeamMeterset = total_mus
         logger.info(f"total MU: {total_mus}")
-
-        cum_weight = 0.0
-
-        coords_mm = coords * 10.0  # convert to mm
 
         for _i, ib in enumerate(self.ds.IonBeamSequence):
             logger.debug(f"apply_model() - ion beam number {_i}")
             # set treatment machine
             ib.TreatmentMachineName = model.field_treatment_machine
 
+            # One pair of control points per energy layer, so the template sequence has to be
+            # rebuilt whenever the plan has more than the single layer it is created with.
+            ib.IonControlPointSequence = pydicom.Sequence(ion_control_points(len(layers)))
+            ib.NumberOfControlPoints = 2 * len(layers)
+
+            cum_weight = 0.0
+            layer_totals: list[float] = []
             for cp_idx, icp in enumerate(ib.IonControlPointSequence):
+                layer = layers[cp_idx // 2]
+                mus = layer_mus[cp_idx // 2]
+
                 icp.ControlPointIndex = cp_idx
-                icp.NominalBeamEnergy = model.spot_energy
+                icp.NominalBeamEnergy = layer.energy
                 if cp_idx == 0:
                     # geometry tags only required on the first control point
                     icp.GantryAngle = model.field_gantry_angle
                     icp.SnoutPosition = model.field_snout_position * 10.0  # convert cm to mm
 
-                icp.TableTopVerticalPosition = model.field_table_position[0] * 10.0  # convert to mm
-                icp.TableTopLongitudinalPosition = model.field_table_position[1] * 10.0  # convert to mm
-                icp.TableTopLateralPosition = model.field_table_position[2] * 10.0  # convert to mm
+                    icp.TableTopVerticalPosition = model.field_table_position[0] * 10.0  # convert to mm
+                    icp.TableTopLongitudinalPosition = model.field_table_position[1] * 10.0  # convert to mm
+                    icp.TableTopLateralPosition = model.field_table_position[2] * 10.0  # convert to mm
 
-                icp.IsocenterPosition = [0.0, 0.0, 0.0]  # assuming iso at origin
+                    icp.IsocenterPosition = [0.0, 0.0, 0.0]  # assuming iso at origin
 
                 icp.CumulativeMetersetWeight = cum_weight  # cumulative MU delivered before this CP
 
-                icp.NumberOfScanSpotPositions = nspots  # TODO: multiple layer handling.
-                icp.ScanSpotPositionMap = coords_mm.tolist()
+                icp.NumberOfScanSpotPositions = layer.nspots
+                icp.ScanSpotPositionMap = (layer.coords * 10.0).tolist()  # convert to mm
 
-                # DICOM RT Ion uses pairs of control points per energy layer: the even CP carries
-                # the actual spot weights; the odd CP is a zero-weight terminator.
-                if icp.ControlPointIndex % 2 == 0:
-                    icp.ScanSpotMetersetWeights = spot_mus.tolist()
-                    cum_weight += float(np.sum(spot_mus))
+                # The even CP of the pair carries the spot weights; the odd CP is a zero-weight
+                # terminator that repeats the same positions and energy.
+                if cp_idx % 2 == 0:
+                    icp.ScanSpotMetersetWeights = mus.tolist()
+                    layer_totals.append(float(np.sum(mus)))
+                    cum_weight = math.fsum(layer_totals)
                 else:
-                    icp.ScanSpotMetersetWeights = zero_weights.tolist()
+                    icp.ScanSpotMetersetWeights = np.zeros(layer.nspots, dtype=np.float32).tolist()
+                    icp.CumulativeMetersetWeight = cum_weight  # terminator sits after the layer
+
+                # Eclipse ramps the dose reference coefficient with the delivered fraction.
+                if 'ReferencedDoseReferenceSequence' in icp and total_mus > 0:
+                    icp.ReferencedDoseReferenceSequence[0].CumulativeDoseReferenceCoefficient = \
+                        icp.CumulativeMetersetWeight / total_mus
+
             ib.FinalCumulativeMetersetWeight = cum_weight  # must equal BeamMeterset
             logger.debug(f"apply_model() - FinalCumulativeMetersetWeight: {cum_weight}")
+
+    @staticmethod
+    def _absolute_mus(model, weights: np.ndarray) -> np.ndarray:
+        """Convert per-spot weights into absolute MU values."""
+        if model.spot_weights_are_absolute_mu:
+            return weights.astype(np.float32, copy=False)
+        if model.spot_mu is None:
+            raise ValueError("spot_mu must be defined when spot weights are relative")
+        return weights * model.spot_mu
 
     def write(self, filename: str):
         """

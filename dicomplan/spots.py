@@ -1,10 +1,62 @@
 import csv
 import logging
+from dataclasses import dataclass
+from typing import Optional
+
 import numpy as np
 from dicomplan.model import PlanInputModel
 import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SpotLayer:
+    """
+    One energy layer of a plan: every spot delivered at a single nominal beam energy.
+
+    A plan built from one of the geometric patterns has exactly one layer. A CSV spot
+    list with an energy column has one layer per energy, in ascending energy order.
+    """
+    energy: float          # MeV
+    coords: np.ndarray     # flat [x0, y0, x1, y1, ...] in cm
+    weights: np.ndarray    # per-spot weight, absolute MU when the model says so
+
+    @property
+    def nspots(self) -> int:
+        return len(self.coords) // 2
+
+
+def _flatten_layers(layers: list[SpotLayer]) -> tuple[np.ndarray, np.ndarray]:
+    """Concatenate the layers into the flat (coords, weights) pair of a single-layer plan."""
+    coords = np.concatenate([layer.coords for layer in layers])
+    weights = np.concatenate([layer.weights for layer in layers])
+    return coords, weights
+
+
+def generate_spot_layers(model: PlanInputModel) -> list[SpotLayer]:
+    """
+    Generate the energy layers of the plan described by the model.
+
+    This is the entry point used to build the DICOM control points: every layer becomes
+    one pair of them. Only CSV spot lists can produce more than one layer; the geometric
+    patterns all return a single layer at model.spot_energy.
+
+    The dose plot, if requested, is drawn once over all layers combined.
+    """
+    if model.spot_shape == 'csv':
+        layers = generate_csv_layers(model)
+    else:
+        layers = [SpotLayer(model.spot_energy, *generate_spot_pattern(model))]
+
+    logger.info("number of energy layers: %d", len(layers))
+
+    if model.plot_dose:
+        logger.info(f"Generating dose plot {model.plot_dose_filepath} with FWHM {model.plot_dose_fwhm} cm")
+        coords, weights = _flatten_layers(layers)
+        _dose_plot(model.plot_dose_filepath, model, coords, weights, model.plot_dose_fwhm)
+
+    return layers
 
 
 def generate_spot_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray]:
@@ -34,10 +86,6 @@ def generate_spot_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray
         coords, weights = generate_csv_pattern(model)
     else:
         raise ValueError(f"Unknown spot shape: {model.spot_shape}")
-
-    if model.plot_dose:
-        logger.info(f"Generating dose plot {model.plot_dose_filepath} with FWHM {model.plot_dose_fwhm} cm")
-        _dose_plot(model.plot_dose_filepath, model, coords, weights, model.plot_dose_fwhm)
 
     return coords, weights
 
@@ -262,16 +310,15 @@ def generate_image_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarra
     return coords, weights
 
 
-def generate_csv_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray]:
+def _read_csv_spots(path: str) -> tuple[list[float], list[float], list[float], Optional[list[float]]]:
     """
-    Generate a spot pattern based on a CSV file.
-    The CSV file should have x, y and mu columns. Coordinates are in cm, and mu is
-    the absolute per-spot monitor unit value.
-    """
-    if model.spot_csv_path is None:
-        raise ValueError("spot_csv_path must be defined for csv pattern")
+    Read a CSV spot list and return the x, y, mu and (optional) energy columns.
 
-    with open(model.spot_csv_path, newline='') as csv_file:
+    The x, y and mu columns are mandatory. The energy column is optional; when absent,
+    None is returned in its place and the whole spot list forms a single energy layer at
+    the energy given on the command line.
+    """
+    with open(path, newline='') as csv_file:
         reader = csv.DictReader(csv_file)
         if reader.fieldnames is None:
             raise ValueError("CSV file must contain 'x', 'y' and 'mu' columns")
@@ -282,28 +329,96 @@ def generate_csv_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray]
             missing = "', '".join(sorted(missing_columns))
             raise ValueError(f"CSV file must contain '{missing}' column(s)")
 
-        x_values = []
-        y_values = []
-        mu_values = []
+        has_energy = 'energy' in columns
+
+        x_values: list[float] = []
+        y_values: list[float] = []
+        mu_values: list[float] = []
+        energy_values: list[float] = []
         for row_number, row in enumerate(reader, start=2):
             try:
                 x_values.append(float(row[columns['x']]))
                 y_values.append(float(row[columns['y']]))
                 mu_values.append(float(row[columns['mu']]))
+                if has_energy:
+                    energy_values.append(float(row[columns['energy']]))
             except (TypeError, ValueError) as exc:
-                raise ValueError(f"CSV row {row_number} must contain numeric x, y and mu values") from exc
+                expected = "x, y, mu and energy" if has_energy else "x, y and mu"
+                raise ValueError(f"CSV row {row_number} must contain numeric {expected} values") from exc
 
     if not x_values:
         raise ValueError("CSV file must contain at least one spot")
 
+    return x_values, y_values, mu_values, energy_values if has_energy else None
+
+
+def _split_energy_layers(energies: list[float]) -> list[tuple[int, int]]:
+    """
+    Split a per-spot energy column into layers of consecutive spots sharing one energy.
+
+    Returns a list of (start, stop) row index pairs. Every change of energy from one row
+    to the next starts a new layer, so the layer order is the row order of the file.
+
+    Energy must increase strictly from layer to layer. A repeated energy further down the
+    file therefore fails rather than silently producing two layers at the same energy,
+    which also catches a spot list that was never sorted by energy in the first place.
+    """
+    bounds = []
+    start = 0
+    for row in range(1, len(energies) + 1):
+        if row == len(energies) or energies[row] != energies[row - 1]:
+            bounds.append((start, row))
+            start = row
+
+    for (prev_start, _), (this_start, _) in zip(bounds, bounds[1:]):
+        previous, current = energies[prev_start], energies[this_start]
+        if current <= previous:
+            raise ValueError(
+                f"CSV energy layers must be in ascending energy order, but the layer starting "
+                f"on row {this_start + 2} has energy {current} MeV after {previous} MeV. "
+                f"Sort the spot list by ascending energy."
+            )
+
+    return bounds
+
+
+def generate_csv_layers(model: PlanInputModel) -> list[SpotLayer]:
+    """
+    Generate the energy layers of a spot pattern from a CSV file.
+
+    The CSV file must have x, y and mu columns and may have an energy column. Coordinates
+    are in cm, mu is the absolute per-spot monitor unit value and energy is in MeV. Every
+    change of the energy column starts a new energy layer; without an energy column the
+    whole file is one layer at model.spot_energy.
+    """
+    if model.spot_csv_path is None:
+        raise ValueError("spot_csv_path must be defined for csv pattern")
+
+    x_values, y_values, mu_values, energies = _read_csv_spots(model.spot_csv_path)
+
     xoffset, yoffset = model.spot_offset
     x_coords = np.asarray(x_values) + xoffset
     y_coords = np.asarray(y_values) + yoffset
-
-    coords = np.column_stack((x_coords, y_coords)).ravel()
+    coords = np.column_stack((x_coords, y_coords))
     weights = np.asarray(mu_values, dtype=np.float32)
 
-    return coords, weights
+    if energies is None:
+        return [SpotLayer(model.spot_energy, coords.ravel(), weights)]
+
+    bounds = _split_energy_layers(energies)
+    logger.debug("CSV spot list split into %d energy layers", len(bounds))
+    return [SpotLayer(energies[start], coords[start:stop].ravel(), weights[start:stop])
+            for start, stop in bounds]
+
+
+def generate_csv_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Generate a spot pattern based on a CSV file, with all energy layers concatenated.
+
+    Use generate_csv_layers() where the per-layer split matters; this flat view is what
+    the single-energy patterns return and is what the dose plot works on.
+    """
+    return _flatten_layers(generate_csv_layers(model))
 
 
 def _flat_grid(x_coords: np.ndarray, y_coords: np.ndarray) -> np.ndarray:
