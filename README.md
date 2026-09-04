@@ -16,7 +16,7 @@ pip install git+https://github.com/nbassler/dicomplan.git
 ## Usage
 
 ```
-dicomplan [options] {square,circle,image} ...
+dicomplan [options] {square,circle,image,csv} ...
 ```
 
 ### Spot pattern types
@@ -26,6 +26,7 @@ dicomplan [options] {square,circle,image} ...
 | `square` | `dx dy` | Rectangular field, `dx` × `dy` cm |
 | `circle` | `diameter` | Circular field with given diameter in cm |
 | `image` | `width height file.png` | Field shaped by a grayscale PNG image |
+| `csv` | `file.csv` | Field described by a CSV spot list with `x`, `y` [cm] and `mu` [MU] columns |
 
 ### Global options
 
@@ -49,17 +50,20 @@ dicomplan [options] {square,circle,image} ...
 
 ### Subcommand options
 
-| Option | Default | `square` | `circle` | `image` | Description |
-|--------|---------|:--------:|:--------:|:-------:|-------------|
-| `--spacing CM` | `0.5` | ✓ | ✓ | ✓ | Spot spacing [cm] |
-| `--mu-per-spot MU` | `10.0` | ✓ | ✓ | ✓ | MU per spot |
-| `--energy MEV` | `120.0` | ✓ | ✓ | ✓ | Beam energy [MeV] |
-| `--xoffset CM` | `0.0` | ✓ | ✓ | ✓ | X offset [cm] |
-| `--yoffset CM` | `0.0` | ✓ | ✓ | ✓ | Y offset [cm] |
-| `--boost_rim FACTOR` | `1.0` | ✓ | ✓ | | Multiply rim spot MU by this factor |
-| `--hex` | off | ✓ | | | Use hexagonal spot grid instead of square |
-| `--trim_corners` | off | ✓ | | | Remove corner spots from square pattern |
-| `--threshold 0–1` | — | | | ✓ | Minimum normalised pixel intensity to place a spot |
+| Option | Default | `square` | `circle` | `image` | `csv` | Description |
+|--------|---------|:--------:|:--------:|:-------:|:-----:|-------------|
+| `--spacing CM` | `0.5` | ✓ | ✓ | ✓ | | Spot spacing [cm] |
+| `--mu-per-spot MU` | `10.0` | ✓ | ✓ | ✓ | | MU per spot |
+| `--energy MEV` | `120.0` | ✓ | ✓ | ✓ | ✓ | Beam energy [MeV] |
+| `--xoffset CM` | `0.0` | ✓ | ✓ | ✓ | ✓ | X offset [cm] |
+| `--yoffset CM` | `0.0` | ✓ | ✓ | ✓ | ✓ | Y offset [cm] |
+| `--boost_rim FACTOR` | `1.0` | ✓ | ✓ | | | Multiply rim spot MU by this factor |
+| `--hex` | off | ✓ | | | | Use hexagonal spot grid instead of square |
+| `--trim_corners` | off | ✓ | | | | Remove corner spots from square pattern |
+| `--threshold 0–1` | — | | | ✓ | | Minimum normalised pixel intensity to place a spot |
+
+The `csv` subcommand takes its spot positions and MU from the file, so `--spacing`,
+`--mu-per-spot` and `--boost_rim` do not apply to it and are rejected.
 
 Run `dicomplan -h` or `dicomplan square -h` for the full option list.
 
@@ -89,6 +93,21 @@ Generate a dose preview plot alongside the DICOM file:
 ```bash
 dicomplan -o plan.dcm square 10 10 --energy 120 --mu-per-spot 20 --dose_plot
 ```
+
+Use a CSV spot list with pre-defined (x, y) spots and per-spot MU. The file needs
+`x`, `y` and `mu` columns, where the positions are in cm at isocentre and `mu` is the
+absolute number of monitor units for that spot (it is not scaled by `--mu-per-spot`):
+```csv
+x,y,mu
+-3.0,-3.0,10.0
+3.0,3.0,10.0
+0.0,0.0,5.0
+```
+```bash
+dicomplan -o plan.dcm csv spotlist.csv --energy 120
+```
+`--xoffset` / `--yoffset` shift the whole spot list, and `--dose_plot` works as it does
+for the other patterns.
 
 ## License
 

@@ -1,3 +1,4 @@
+import csv
 import logging
 import numpy as np
 from dicomplan.model import PlanInputModel
@@ -29,6 +30,8 @@ def generate_spot_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray
         coords, weights = generate_circular_pattern(model)
     elif model.spot_shape == 'image':
         coords, weights = generate_image_pattern(model)
+    elif model.spot_shape == 'csv':
+        coords, weights = generate_csv_pattern(model)
     else:
         raise ValueError(f"Unknown spot shape: {model.spot_shape}")
 
@@ -259,6 +262,50 @@ def generate_image_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarra
     return coords, weights
 
 
+def generate_csv_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Generate a spot pattern based on a CSV file.
+    The CSV file should have x, y and mu columns. Coordinates are in cm, and mu is
+    the absolute per-spot monitor unit value.
+    """
+    if model.spot_csv_path is None:
+        raise ValueError("spot_csv_path must be defined for csv pattern")
+
+    with open(model.spot_csv_path, newline='') as csv_file:
+        reader = csv.DictReader(csv_file)
+        if reader.fieldnames is None:
+            raise ValueError("CSV file must contain 'x', 'y' and 'mu' columns")
+
+        columns = {name.strip().lower(): name for name in reader.fieldnames}
+        missing_columns = {'x', 'y', 'mu'} - set(columns)
+        if missing_columns:
+            missing = "', '".join(sorted(missing_columns))
+            raise ValueError(f"CSV file must contain '{missing}' column(s)")
+
+        x_values = []
+        y_values = []
+        mu_values = []
+        for row_number, row in enumerate(reader, start=2):
+            try:
+                x_values.append(float(row[columns['x']]))
+                y_values.append(float(row[columns['y']]))
+                mu_values.append(float(row[columns['mu']]))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"CSV row {row_number} must contain numeric x, y and mu values") from exc
+
+    if not x_values:
+        raise ValueError("CSV file must contain at least one spot")
+
+    xoffset, yoffset = model.spot_offset
+    x_coords = np.asarray(x_values) + xoffset
+    y_coords = np.asarray(y_values) + yoffset
+
+    coords = np.column_stack((x_coords, y_coords)).ravel()
+    weights = np.asarray(mu_values, dtype=np.float32)
+
+    return coords, weights
+
+
 def _flat_grid(x_coords: np.ndarray, y_coords: np.ndarray) -> np.ndarray:
     """
     Flatten the grid of coordinates into a single array.
@@ -308,6 +355,21 @@ def _boost_rim_spots(coords: np.ndarray, weights: np.ndarray, model: PlanInputMo
     return weights
 
 
+def _dose_plot_extent(coords: np.ndarray, margin: float = 1.0) -> tuple[float, float, float, float]:
+    """
+    Return the (xmin, xmax, ymin, ymax) window in cm covering all spots plus a margin.
+
+    The extent is derived from the actual spot positions rather than from
+    model.spot_xymin/spot_xymax, which are only meaningful for the square and image
+    patterns and stay at the origin for csv spot lists - clipping every spot outside
+    the margin out of the plot.
+    """
+    spot_xy = coords.reshape(-1, 2)
+    xmin, ymin = spot_xy.min(axis=0)
+    xmax, ymax = spot_xy.max(axis=0)
+    return float(xmin - margin), float(xmax + margin), float(ymin - margin), float(ymax + margin)
+
+
 def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: np.ndarray, fwhm: list[float]) -> None:
     '''
     Generate a dose plot of the plan, and save it as a PNG file.
@@ -316,8 +378,9 @@ def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: n
     '''
 
     resolution = 0.01  # cm
-    x = np.arange(model.spot_xymin[0] - 1, model.spot_xymax[0] + 1, resolution)
-    y = np.arange(model.spot_xymin[1] - 1, model.spot_xymax[1] + 1, resolution)
+    xmin, xmax, ymin, ymax = _dose_plot_extent(coords)
+    x = np.arange(xmin, xmax, resolution)
+    y = np.arange(ymin, ymax, resolution)
     X, Y = np.meshgrid(x, y, indexing='ij')
     dose = np.zeros_like(X)
 

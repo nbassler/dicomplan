@@ -38,11 +38,15 @@ class PlanInputModel:
 
         self.spot_energy: float = 0.0  # MeV
         self.spot_mu: Optional[float] = None
+        self.spot_weights_are_absolute_mu: bool = False
         self.spot_shape: Optional[str] = None  # circular, square, or image
         self.spot_pattern_type: Optional[str] = None  # square or hexagonal
 
         # in case of user loads a png image, this will be the path to the image
         self.spot_image_path: Optional[str] = None
+
+        self.spot_csv_path: Optional[str] = None  # path to csv file with spot positions
+        self.spot_offset: list[float] = [0.0, 0.0]  # cm, used for csv spot lists
 
         self.plot_dose: bool = False
 
