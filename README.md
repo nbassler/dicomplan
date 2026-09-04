@@ -26,7 +26,7 @@ dicomplan [options] {square,circle,image,csv} ...
 | `square` | `dx dy` | Rectangular field, `dx` × `dy` cm |
 | `circle` | `diameter` | Circular field with given diameter in cm |
 | `image` | `width height file.png` | Field shaped by a grayscale PNG image |
-| `csv` | `file.csv` | Field described by a CSV spot list with `x`, `y` [cm] and `mu` [MU] columns |
+| `csv` | `file.csv` | Field described by a CSV spot list with `x`, `y` [cm], `mu` [MU] and optional `energy` [MeV] columns |
 
 ### Global options
 
@@ -54,7 +54,7 @@ dicomplan [options] {square,circle,image,csv} ...
 |--------|---------|:--------:|:--------:|:-------:|:-----:|-------------|
 | `--spacing CM` | `0.5` | ✓ | ✓ | ✓ | | Spot spacing [cm] |
 | `--mu-per-spot MU` | `10.0` | ✓ | ✓ | ✓ | | MU per spot |
-| `--energy MEV` | `120.0` | ✓ | ✓ | ✓ | ✓ | Beam energy [MeV] |
+| `--energy MEV` | `120.0` | ✓ | ✓ | ✓ | (✓) | Beam energy [MeV], ignored by `csv` when the file has an `energy` column |
 | `--xoffset CM` | `0.0` | ✓ | ✓ | ✓ | ✓ | X offset [cm] |
 | `--yoffset CM` | `0.0` | ✓ | ✓ | ✓ | ✓ | Y offset [cm] |
 | `--boost_rim FACTOR` | `1.0` | ✓ | ✓ | | | Multiply rim spot MU by this factor |
@@ -108,6 +108,27 @@ dicomplan -o plan.dcm csv spotlist.csv --energy 120
 ```
 `--xoffset` / `--yoffset` shift the whole spot list, and `--dose_plot` works as it does
 for the other patterns.
+
+#### Energy layers
+
+Add an optional fourth `energy` column [MeV] to build a multi-layer plan. Every change of
+the energy value starts a new energy layer, which becomes one pair of control points in the
+RT plan, so the row order of the file is the layer order of the plan:
+
+```csv
+x,y,mu,energy
+-1.0,-1.0,10.0,100.0
+1.0,-1.0,10.0,100.0
+-1.0,1.0,20.0,120.0
+0.0,0.0,30.0,120.0
+0.0,2.0,5.0,150.0
+```
+
+The example above gives three layers at 100, 120 and 150 MeV, holding two, two and one
+spot. **The energy must increase strictly from layer to layer.** A file that steps back
+down in energy, or that repeats an energy it already used, is rejected rather than
+silently producing a plan in the wrong order. Without an `energy` column the whole spot
+list is a single layer at `--energy`.
 
 ## License
 

@@ -1,10 +1,18 @@
 import pydicom
 
 
-def ion_control_points() -> pydicom.Sequence:
+def ion_control_points(n_layers: int = 1) -> pydicom.Sequence:
     """
-    Create an IonControlPointSequence with at least two items.
+    Create an IonControlPointSequence holding one pair of control points per energy layer.
+
+    DICOM RT Ion describes each energy layer with two control points: the even one carries
+    the spot weights, the odd one is a zero-weight terminator repeating the same positions.
+    Only the very first control point of the beam carries the geometry tags (gantry, snout,
+    table, isocentre); every later one is terse.
     """
+    if n_layers < 1:
+        raise ValueError(f"n_layers must be at least 1, got {n_layers}")
+
     icps = pydicom.Sequence()
 
     # first dataset is more verbose, than the rest.
@@ -59,6 +67,11 @@ def ion_control_points() -> pydicom.Sequence:
     new_cummulative_meterset_weight = icp.CumulativeMetersetWeight + cm
     icps.append(_ion_control_point_next(1, empty=True, cm=new_cummulative_meterset_weight))
 
+    # Remaining layers: a weighted control point followed by its zero-weight terminator.
+    # apply_model() overwrites the placeholder energies, positions and weights.
+    for idx in range(2, 2 * n_layers):
+        icps.append(_ion_control_point_next(idx, empty=bool(idx % 2), cm=new_cummulative_meterset_weight))
+
     return icps
 
 
@@ -77,6 +90,7 @@ def _ion_control_point_next(idx: int, empty=False, cm=0.0) -> pydicom.Dataset:
         icp.ScanSpotMetersetWeights = [0.0]                       # 300a,0396
     else:
         icp.ScanSpotMetersetWeights = [16.0]                       # 300a,0396
+    icp.ScanningSpotSize = [11.3, 11.2]                           # 300a,0398
     icp.NumberOfPaintings = 1                                     # 300a,039a
     icp[0x300b, 0x0010] = pydicom.DataElement(0x300b0010, 'SH', 'IMPAC')   # 300b,0010
     icp[0x300b, 0x1017] = pydicom.DataElement(0x300b1017, 'UN', b'Qs\xa1B')    # 300b,1017  unknown,
