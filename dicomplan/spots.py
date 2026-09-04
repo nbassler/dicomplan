@@ -1,3 +1,4 @@
+import csv
 import logging
 import numpy as np
 from dicomplan.model import PlanInputModel
@@ -264,26 +265,43 @@ def generate_image_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarra
 def generate_csv_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarray]:
     """
     Generate a spot pattern based on a CSV file.
-    The CSV file should have two columns: x and y coordinates of the spots in cm.
+    The CSV file should have x, y and mu columns. Coordinates are in cm, and mu is
+    the absolute per-spot monitor unit value.
     """
-    import pandas as pd
-
     if model.spot_csv_path is None:
         raise ValueError("spot_csv_path must be defined for csv pattern")
 
-    # Load CSV
-    df = pd.read_csv(model.spot_csv_path)
+    with open(model.spot_csv_path, newline='') as csv_file:
+        reader = csv.DictReader(csv_file)
+        if reader.fieldnames is None:
+            raise ValueError("CSV file must contain 'x', 'y' and 'mu' columns")
 
-    if 'x' not in df.columns or 'y' not in df.columns:
-        raise ValueError("CSV file must contain 'x' and 'y' columns")
-    if 'mu' not in df.columns:
-        raise ValueError("CSV file must contain 'mu' column for spot weights")
+        columns = {name.strip().lower(): name for name in reader.fieldnames}
+        missing_columns = {'x', 'y', 'mu'} - set(columns)
+        if missing_columns:
+            missing = "', '".join(sorted(missing_columns))
+            raise ValueError(f"CSV file must contain '{missing}' column(s)")
 
-    x_coords = df['x'].values
-    y_coords = df['y'].values
+        x_values = []
+        y_values = []
+        mu_values = []
+        for row_number, row in enumerate(reader, start=2):
+            try:
+                x_values.append(float(row[columns['x']]))
+                y_values.append(float(row[columns['y']]))
+                mu_values.append(float(row[columns['mu']]))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"CSV row {row_number} must contain numeric x, y and mu values") from exc
+
+    if not x_values:
+        raise ValueError("CSV file must contain at least one spot")
+
+    xoffset, yoffset = model.spot_offset
+    x_coords = np.asarray(x_values) + xoffset
+    y_coords = np.asarray(y_values) + yoffset
 
     coords = np.column_stack((x_coords, y_coords)).ravel()
-    weights = df['mu'].values.astype(np.float32)
+    weights = np.asarray(mu_values, dtype=np.float32)
 
     return coords, weights
 

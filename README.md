@@ -16,7 +16,7 @@ pip install git+https://github.com/nbassler/dicomplan.git
 ## Usage
 
 ```
-dicomplan [options] {square,circle,image} ...
+dicomplan [options] {square,circle,image,csv} ...
 ```
 
 ### Spot pattern types
@@ -26,7 +26,7 @@ dicomplan [options] {square,circle,image} ...
 | `square` | `dx dy` | Rectangular field, `dx` × `dy` cm |
 | `circle` | `diameter` | Circular field with given diameter in cm |
 | `image` | `width height file.png` | Field shaped by a grayscale PNG image |
-| `csv` | `file.csv` | Field described by a csv spotlist with x, y and MU
+| `csv` | `file.csv` | Field described by a CSV spot list with x, y and mu columns |
 
 ### Global options
 

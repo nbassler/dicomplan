@@ -40,12 +40,13 @@ class Dicom:
         self.ds.StudyDate = now.strftime('%Y%m%d')
         self.ds.StudyTime = now.strftime('%H%M%S.%f')[:-3]
 
-        # get the spot pattern: coords are (x,y) pairs, weights are per-spot relative intensities.
+        # get the spot pattern: coords are (x,y) pairs, weights are per-spot relative intensities
+        # unless the model declares them as absolute MU values, as CSV spot lists do.
         # For a plain pattern, weights are all 1.0. If --boost_rim is set, rim spot weights are
         # multiplied by the boost factor inside generate_spot_pattern before returning here.
         coords, weights = generate_spot_pattern(model)
         nspots = len(coords) // 2  # total number of spots
-        zero_weights = np.zeros(nspots)
+        zero_weights = np.zeros(nspots, dtype=np.float32)
         logger.info(f"number of spots: {nspots}")
 
         # check if coords length is exactly 2*nspots
@@ -54,10 +55,16 @@ class Dicom:
 
         # Scale relative weights to absolute MU values. Center spots become spot_mu MU each;
         # rim spots are already boosted (weight > 1.0), so they get boost_rim * spot_mu MU each.
-        weights *= model.spot_mu
+        if model.spot_weights_are_absolute_mu:
+            spot_mus = weights.astype(np.float32, copy=False)
+        else:
+            if model.spot_mu is None:
+                raise ValueError("spot_mu must be defined when spot weights are relative")
+            spot_mus = weights * model.spot_mu
+
         # BeamMeterset must equal FinalCumulativeMetersetWeight, so derive it from the actual
         # sum rather than nspots * spot_mu, which would be wrong when rim is boosted.
-        total_mus = float(np.sum(weights))
+        total_mus = float(np.sum(spot_mus))
         self.ds.FractionGroupSequence[0].ReferencedBeamSequence[0].BeamMeterset = total_mus
         logger.info(f"total MU: {total_mus}")
 
@@ -92,8 +99,8 @@ class Dicom:
                 # DICOM RT Ion uses pairs of control points per energy layer: the even CP carries
                 # the actual spot weights; the odd CP is a zero-weight terminator.
                 if icp.ControlPointIndex % 2 == 0:
-                    icp.ScanSpotMetersetWeights = weights.tolist()
-                    cum_weight += sum(weights)
+                    icp.ScanSpotMetersetWeights = spot_mus.tolist()
+                    cum_weight += float(np.sum(spot_mus))
                 else:
                     icp.ScanSpotMetersetWeights = zero_weights.tolist()
             ib.FinalCumulativeMetersetWeight = cum_weight  # must equal BeamMeterset

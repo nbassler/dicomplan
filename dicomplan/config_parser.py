@@ -128,19 +128,14 @@ def parse_arguments(args=None):
                        help='Y offset [cm]')
 
     # CSV spotlist pattern
-    # Arguments "spacing", "mu-per-spot", "xoffset" and "yoffset" are not used for CSV pattern, but are included for consistency with other patterns.
     csv = subparsers.add_parser('csv', help='Generate a spot pattern from CSV')
     csv.add_argument('csv_path', type=str, help='Path to CSV file with spot positions')
-    csv.add_argument('--spacing', type=float, default=DEFAULT_SPOT_SPACING,
-                       help='Spot spacing [cm]')
-    csv.add_argument('--mu-per-spot', type=float, default=DEFAULT_MU_PER_SPOT,
-                       help='Average amount of MU per spot')
     csv.add_argument('--energy', type=float, default=DEFAULT_ENERGY,
-                       help='Beam energy [MeV]')
+                     help='Beam energy [MeV]')
     csv.add_argument('--xoffset', type=float, default=0.0,
-                       help='X offset [cm]')
+                     help='X offset [cm]')
     csv.add_argument('--yoffset', type=float, default=0.0,
-                       help='Y offset [cm]')
+                     help='Y offset [cm]')
 
     return parser.parse_args(args)
 
@@ -184,8 +179,8 @@ def get_model_from_args(args) -> PlanInputModel:
     model.plan_operator_name = args.operator_name
 
     # Set the spot spacing and MU per spot
-    model.spot_spacing = args.spacing
-    model.spot_mu = args.mu_per_spot
+    model.spot_spacing = getattr(args, 'spacing', None)
+    model.spot_mu = getattr(args, 'mu_per_spot', None)
 
     # set plotting options
     model.plot_dose = args.dose_plot
@@ -224,6 +219,7 @@ def get_model_from_args(args) -> PlanInputModel:
     elif args.pattern_type == 'csv':
         model.spot_shape = 'csv'
         model.spot_csv_path = args.csv_path
+        model.spot_weights_are_absolute_mu = True
 
     _apply_offset(model, args.xoffset, args.yoffset)
 
@@ -238,6 +234,8 @@ def _apply_offset(model: PlanInputModel, xoffset: float, yoffset: float) -> None
     if model.spot_shape == 'circle':
         model.spot_center[0] += xoffset
         model.spot_center[1] += yoffset
+    elif model.spot_shape == 'csv':
+        model.spot_offset = [xoffset, yoffset]
     else:   # square or image
         model.spot_xymin[0] += xoffset
         model.spot_xymax[0] += xoffset
