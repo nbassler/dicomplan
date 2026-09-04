@@ -2,7 +2,7 @@ import pytest
 
 from dicomplan.config_parser import get_model_from_args, parse_arguments
 from dicomplan.dicom import Dicom
-from dicomplan.spots import generate_csv_pattern
+from dicomplan.spots import _dose_plot_extent, generate_csv_pattern, generate_spot_pattern
 
 
 class TestParseArgumentsCsv:
@@ -74,3 +74,27 @@ class TestCsvDicomIntegration:
         assert first_control_point.ScanSpotPositionMap == pytest.approx([20.0, 0.0, 0.0, -15.0])
         assert dicom.ds.FractionGroupSequence[0].ReferencedBeamSequence[0].BeamMeterset == pytest.approx(10.0)
         assert dicom.ds.IonBeamSequence[0].FinalCumulativeMetersetWeight == pytest.approx(10.0)
+
+
+class TestCsvDosePlot:
+    def test_plot_extent_covers_all_spots(self, tmp_path):
+        csv_path = tmp_path / "spots.csv"
+        csv_path.write_text("x,y,mu\n-3.0,-3.0,10\n3.0,2.0,10\n0.0,0.0,5\n")
+        args = parse_arguments(["csv", str(csv_path)])
+        model = get_model_from_args(args)
+
+        coords, _ = generate_csv_pattern(model)
+
+        assert _dose_plot_extent(coords) == pytest.approx((-4.0, 4.0, -4.0, 3.0))
+
+    def test_dose_plot_is_written_for_csv_spots(self, tmp_path):
+        csv_path = tmp_path / "spots.csv"
+        csv_path.write_text("x,y,mu\n-3.0,-3.0,10\n3.0,3.0,10\n")
+        plot_path = tmp_path / "plot_dose.png"
+        args = parse_arguments(["--dose_plot", "--dose_plot_filepath", str(plot_path),
+                                "csv", str(csv_path)])
+        model = get_model_from_args(args)
+
+        generate_spot_pattern(model)
+
+        assert plot_path.exists()

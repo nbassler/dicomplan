@@ -355,6 +355,21 @@ def _boost_rim_spots(coords: np.ndarray, weights: np.ndarray, model: PlanInputMo
     return weights
 
 
+def _dose_plot_extent(coords: np.ndarray, margin: float = 1.0) -> tuple[float, float, float, float]:
+    """
+    Return the (xmin, xmax, ymin, ymax) window in cm covering all spots plus a margin.
+
+    The extent is derived from the actual spot positions rather than from
+    model.spot_xymin/spot_xymax, which are only meaningful for the square and image
+    patterns and stay at the origin for csv spot lists - clipping every spot outside
+    the margin out of the plot.
+    """
+    spot_xy = coords.reshape(-1, 2)
+    xmin, ymin = spot_xy.min(axis=0)
+    xmax, ymax = spot_xy.max(axis=0)
+    return float(xmin - margin), float(xmax + margin), float(ymin - margin), float(ymax + margin)
+
+
 def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: np.ndarray, fwhm: list[float]) -> None:
     '''
     Generate a dose plot of the plan, and save it as a PNG file.
@@ -363,8 +378,9 @@ def _dose_plot(fname: str, model: PlanInputModel, coords: np.ndarray, weights: n
     '''
 
     resolution = 0.01  # cm
-    x = np.arange(model.spot_xymin[0] - 1, model.spot_xymax[0] + 1, resolution)
-    y = np.arange(model.spot_xymin[1] - 1, model.spot_xymax[1] + 1, resolution)
+    xmin, xmax, ymin, ymax = _dose_plot_extent(coords)
+    x = np.arange(xmin, xmax, resolution)
+    y = np.arange(ymin, ymax, resolution)
     X, Y = np.meshgrid(x, y, indexing='ij')
     dose = np.zeros_like(X)
 
