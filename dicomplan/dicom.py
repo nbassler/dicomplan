@@ -3,6 +3,7 @@ from pydicom.uid import ImplicitVRLittleEndian, PYDICOM_IMPLEMENTATION_UID
 
 import datetime
 import logging
+import math
 import xml.etree.ElementTree as ET
 import numpy as np
 
@@ -59,7 +60,10 @@ class Dicom:
 
         # BeamMeterset must equal FinalCumulativeMetersetWeight, so derive it from the actual
         # sum rather than nspots * spot_mu, which would be wrong when rim is boosted.
-        total_mus = float(sum(np.sum(mus) for mus in layer_mus))
+        # Each layer sum is widened to float64 before accumulating: summing the float32 layer
+        # totals directly keeps the running total in float32, whose ~2e-3 resolution at 3e4 MU
+        # is enough to drift away from the float64 cum_weight built up in the loop below.
+        total_mus = math.fsum(float(np.sum(mus)) for mus in layer_mus)
         self.ds.FractionGroupSequence[0].ReferencedBeamSequence[0].BeamMeterset = total_mus
         logger.info(f"total MU: {total_mus}")
 
@@ -74,6 +78,7 @@ class Dicom:
             ib.NumberOfControlPoints = 2 * len(layers)
 
             cum_weight = 0.0
+            layer_totals: list[float] = []
             for cp_idx, icp in enumerate(ib.IonControlPointSequence):
                 layer = layers[cp_idx // 2]
                 mus = layer_mus[cp_idx // 2]
@@ -100,7 +105,8 @@ class Dicom:
                 # terminator that repeats the same positions and energy.
                 if cp_idx % 2 == 0:
                     icp.ScanSpotMetersetWeights = mus.tolist()
-                    cum_weight += float(np.sum(mus))
+                    layer_totals.append(float(np.sum(mus)))
+                    cum_weight = math.fsum(layer_totals)
                 else:
                     icp.ScanSpotMetersetWeights = np.zeros(layer.nspots, dtype=np.float32).tolist()
                     icp.CumulativeMetersetWeight = cum_weight  # terminator sits after the layer

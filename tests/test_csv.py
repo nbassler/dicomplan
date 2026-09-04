@@ -252,3 +252,23 @@ class TestCsvEnergyLayersDicom:
         for cp in cps[1:]:
             assert 'GantryAngle' not in cp
             assert 'SnoutPosition' not in cp
+
+    def test_beam_meterset_matches_final_cumulative_weight_over_many_layers(self, tmp_path):
+        # 12 layers of 153 spots at ~30000 MU total: summing the float32 layer totals in
+        # float32 drifts by ~2e-3 and breaks the BeamMeterset == FinalCumulativeMetersetWeight
+        # requirement, which a handful of spots is too small to expose.
+        csv_path = tmp_path / "spots.csv"
+        rows = ["x,y,mu,energy"]
+        for layer in range(12):
+            for spot in range(153):
+                rows.append(f"{spot * 0.25 - 2.0},{layer * 0.1 - 1.0},7.816363E+00,{219.2 + layer * 2.2}")
+        csv_path.write_text("\n".join(rows) + "\n")
+
+        args = parse_arguments(["csv", str(csv_path)])
+        dicom = Dicom()
+        dicom.apply_model(get_model_from_args(args))
+
+        ib = dicom.ds.IonBeamSequence[0]
+        beam_meterset = dicom.ds.FractionGroupSequence[0].ReferencedBeamSequence[0].BeamMeterset
+        assert ib.NumberOfControlPoints == 24
+        assert beam_meterset == ib.FinalCumulativeMetersetWeight
