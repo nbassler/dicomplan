@@ -117,18 +117,20 @@ RT plan, so the row order of the file is the layer order of the plan:
 
 ```csv
 x,y,mu,energy
--1.0,-1.0,10.0,100.0
-1.0,-1.0,10.0,100.0
+-1.0,-1.0,10.0,150.0
+1.0,-1.0,10.0,150.0
 -1.0,1.0,20.0,120.0
 0.0,0.0,30.0,120.0
-0.0,2.0,5.0,150.0
+0.0,2.0,5.0,100.0
 ```
 
-The example above gives three layers at 100, 120 and 150 MeV, holding two, two and one
-spot. **The energy must increase strictly from layer to layer.** A file that steps back
-down in energy, or that repeats an energy it already used, is rejected rather than
-silently producing a plan in the wrong order. Without an `energy` column the whole spot
-list is a single layer at `--energy`.
+The example above gives three layers at 150, 120 and 100 MeV, holding two, two and one
+spot. **The energy must decrease strictly from layer to layer — highest energy first.**
+That is the order treatment machines deliver in, deepest layer first, and Eclipse rejects
+a plan whose layers run the other way. A file that steps back up in energy, or that
+repeats an energy it already used, is rejected rather than silently producing a plan the
+console will refuse. Sort your spot list by descending energy before converting it.
+Without an `energy` column the whole spot list is a single layer at `--energy`.
 
 ## License
 

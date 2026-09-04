@@ -119,24 +119,24 @@ class TestCsvEnergyLayers:
     def test_energy_change_starts_a_new_layer(self, tmp_path):
         csv_path = tmp_path / "spots.csv"
         csv_path.write_text("x,y,mu,energy\n"
-                            "-1.0,-1.0,10.0,100.0\n"
-                            "1.0,-1.0,10.0,100.0\n"
+                            "-1.0,-1.0,10.0,150.0\n"
+                            "1.0,-1.0,10.0,150.0\n"
                             "-1.0,1.0,20.0,120.0\n"
                             "0.0,0.0,30.0,120.0\n"
-                            "0.0,2.0,5.0,150.0\n")
+                            "0.0,2.0,5.0,100.0\n")
         args = parse_arguments(["csv", str(csv_path)])
         model = get_model_from_args(args)
 
         layers = generate_csv_layers(model)
 
-        assert [layer.energy for layer in layers] == [100.0, 120.0, 150.0]
+        assert [layer.energy for layer in layers] == [150.0, 120.0, 100.0]
         assert [layer.nspots for layer in layers] == [2, 2, 1]
         assert layers[1].coords == pytest.approx([-1.0, 1.0, 0.0, 0.0])
         assert layers[1].weights == pytest.approx([20.0, 30.0])
 
     def test_offset_applies_to_every_layer(self, tmp_path):
         csv_path = tmp_path / "spots.csv"
-        csv_path.write_text("x,y,mu,energy\n0.0,0.0,1.0,100.0\n0.0,0.0,1.0,120.0\n")
+        csv_path.write_text("x,y,mu,energy\n0.0,0.0,1.0,120.0\n0.0,0.0,1.0,100.0\n")
         args = parse_arguments(["csv", str(csv_path), "--xoffset", "1.0", "--yoffset", "-2.0"])
         model = get_model_from_args(args)
 
@@ -145,22 +145,24 @@ class TestCsvEnergyLayers:
         assert layers[0].coords == pytest.approx([1.0, -2.0])
         assert layers[1].coords == pytest.approx([1.0, -2.0])
 
-    def test_descending_energy_is_rejected(self, tmp_path):
+    def test_ascending_energy_is_rejected(self, tmp_path):
+        # Machines deliver the deepest layer first, so a spot list that climbs in energy is
+        # the wrong way round and Eclipse refuses the plan.
         csv_path = tmp_path / "spots.csv"
-        csv_path.write_text("x,y,mu,energy\n0.0,0.0,1.0,150.0\n1.0,1.0,1.0,100.0\n")
+        csv_path.write_text("x,y,mu,energy\n0.0,0.0,1.0,100.0\n1.0,1.0,1.0,150.0\n")
         args = parse_arguments(["csv", str(csv_path)])
         model = get_model_from_args(args)
 
-        with pytest.raises(ValueError, match="ascending energy order"):
+        with pytest.raises(ValueError, match="descending energy order"):
             generate_csv_layers(model)
 
     def test_repeated_energy_further_down_is_rejected(self, tmp_path):
         csv_path = tmp_path / "spots.csv"
-        csv_path.write_text("x,y,mu,energy\n0.0,0.0,1.0,100.0\n1.0,1.0,1.0,150.0\n2.0,2.0,1.0,100.0\n")
+        csv_path.write_text("x,y,mu,energy\n0.0,0.0,1.0,150.0\n1.0,1.0,1.0,100.0\n2.0,2.0,1.0,150.0\n")
         args = parse_arguments(["csv", str(csv_path)])
         model = get_model_from_args(args)
 
-        with pytest.raises(ValueError, match="ascending energy order"):
+        with pytest.raises(ValueError, match="descending energy order"):
             generate_csv_layers(model)
 
     def test_non_numeric_energy_is_rejected(self, tmp_path):
@@ -174,7 +176,7 @@ class TestCsvEnergyLayers:
 
     def test_dose_plot_covers_all_layers(self, tmp_path):
         csv_path = tmp_path / "spots.csv"
-        csv_path.write_text("x,y,mu,energy\n-3.0,0.0,1.0,100.0\n3.0,0.0,1.0,120.0\n")
+        csv_path.write_text("x,y,mu,energy\n-3.0,0.0,1.0,120.0\n3.0,0.0,1.0,100.0\n")
         args = parse_arguments(["csv", str(csv_path)])
         model = get_model_from_args(args)
 
@@ -193,11 +195,11 @@ class TestCsvEnergyLayersDicom:
     def _plan(self, tmp_path):
         csv_path = tmp_path / "spots.csv"
         csv_path.write_text("x,y,mu,energy\n"
-                            "-1.0,-1.0,10.0,100.0\n"
-                            "1.0,-1.0,10.0,100.0\n"
+                            "-1.0,-1.0,10.0,150.0\n"
+                            "1.0,-1.0,10.0,150.0\n"
                             "-1.0,1.0,20.0,120.0\n"
                             "0.0,0.0,30.0,120.0\n"
-                            "0.0,2.0,5.0,150.0\n")
+                            "0.0,2.0,5.0,100.0\n")
         args = parse_arguments(["csv", str(csv_path)])
         dicom = Dicom()
         dicom.apply_model(get_model_from_args(args))
@@ -213,7 +215,7 @@ class TestCsvEnergyLayersDicom:
     def test_both_control_points_of_a_pair_share_energy_and_positions(self, tmp_path):
         cps = self._plan(tmp_path).ds.IonBeamSequence[0].IonControlPointSequence
 
-        assert [cp.NominalBeamEnergy for cp in cps] == [100.0, 100.0, 120.0, 120.0, 150.0, 150.0]
+        assert [cp.NominalBeamEnergy for cp in cps] == [150.0, 150.0, 120.0, 120.0, 100.0, 100.0]
         assert [cp.NumberOfScanSpotPositions for cp in cps] == [2, 2, 2, 2, 1, 1]
         for even, odd in zip(cps[::2], cps[1::2]):
             assert list(even.ScanSpotPositionMap) == list(odd.ScanSpotPositionMap)
@@ -261,7 +263,7 @@ class TestCsvEnergyLayersDicom:
         rows = ["x,y,mu,energy"]
         for layer in range(12):
             for spot in range(153):
-                rows.append(f"{spot * 0.25 - 2.0},{layer * 0.1 - 1.0},7.816363E+00,{219.2 + layer * 2.2}")
+                rows.append(f"{spot * 0.25 - 2.0},{layer * 0.1 - 1.0},7.816363E+00,{243.2 - layer * 2.2}")
         csv_path.write_text("\n".join(rows) + "\n")
 
         args = parse_arguments(["csv", str(csv_path)])

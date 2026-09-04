@@ -16,7 +16,7 @@ class SpotLayer:
     One energy layer of a plan: every spot delivered at a single nominal beam energy.
 
     A plan built from one of the geometric patterns has exactly one layer. A CSV spot
-    list with an energy column has one layer per energy, in ascending energy order.
+    list with an energy column has one layer per energy, in descending energy order.
     """
     energy: float          # MeV
     coords: np.ndarray     # flat [x0, y0, x1, y1, ...] in cm
@@ -359,9 +359,11 @@ def _split_energy_layers(energies: list[float]) -> list[tuple[int, int]]:
     Returns a list of (start, stop) row index pairs. Every change of energy from one row
     to the next starts a new layer, so the layer order is the row order of the file.
 
-    Energy must increase strictly from layer to layer. A repeated energy further down the
-    file therefore fails rather than silently producing two layers at the same energy,
-    which also catches a spot list that was never sorted by energy in the first place.
+    Energy must decrease strictly from layer to layer: treatment machines deliver the
+    deepest layer first, and Eclipse rejects a plan whose layers run the other way. A
+    repeated energy further down the file therefore fails rather than silently producing
+    two layers at the same energy, which also catches a spot list that was never sorted by
+    energy in the first place.
     """
     bounds = []
     start = 0
@@ -372,11 +374,11 @@ def _split_energy_layers(energies: list[float]) -> list[tuple[int, int]]:
 
     for (prev_start, _), (this_start, _) in zip(bounds, bounds[1:]):
         previous, current = energies[prev_start], energies[this_start]
-        if current <= previous:
+        if current >= previous:
             raise ValueError(
-                f"CSV energy layers must be in ascending energy order, but the layer starting "
+                f"CSV energy layers must be in descending energy order, but the layer starting "
                 f"on row {this_start + 2} has energy {current} MeV after {previous} MeV. "
-                f"Sort the spot list by ascending energy."
+                f"Sort the spot list by descending energy, highest energy first."
             )
 
     return bounds
@@ -388,8 +390,9 @@ def generate_csv_layers(model: PlanInputModel) -> list[SpotLayer]:
 
     The CSV file must have x, y and mu columns and may have an energy column. Coordinates
     are in cm, mu is the absolute per-spot monitor unit value and energy is in MeV. Every
-    change of the energy column starts a new energy layer; without an energy column the
-    whole file is one layer at model.spot_energy.
+    change of the energy column starts a new energy layer, in the row order of the file and
+    therefore descending in energy; without an energy column the whole file is one layer at
+    model.spot_energy.
     """
     if model.spot_csv_path is None:
         raise ValueError("spot_csv_path must be defined for csv pattern")
