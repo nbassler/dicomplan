@@ -4,6 +4,7 @@ from pydicom.uid import ImplicitVRLittleEndian, PYDICOM_IMPLEMENTATION_UID
 import datetime
 import logging
 import math
+import struct
 import xml.etree.ElementTree as ET
 import numpy as np
 
@@ -17,6 +18,22 @@ from dicomplan.spots import generate_spot_layers
 
 
 logger = logging.getLogger(__name__)
+
+
+# Varian private tag (300b,1017) holds the proton range in water in mm, and (300b,100e) the
+# modulation width. Both were previously copied verbatim out of a 103 MeV reference plan, so
+# every layer of every plan claimed an 80.7 mm range whatever its energy.
+#
+# Fitted to the 9 (energy, range) pairs of ../dicomfix/res/Plan5.5.dcm and PlanMono.dcm, which
+# span 83.4 - 160.0 MeV and are reproduced to within 0.15%. This is the Bragg-Kleeman form,
+# R = alpha * E^p, and agrees with the textbook R[cm] = 0.0022 * E^1.77 for water.
+RANGE_ALPHA = 0.0224755  # mm / MeV**RANGE_EXPONENT
+RANGE_EXPONENT = 1.7653
+
+
+def range_in_water_mm(energy_mev: float) -> float:
+    """Proton range in water in mm for a nominal beam energy in MeV."""
+    return RANGE_ALPHA * energy_mev ** RANGE_EXPONENT
 
 
 class Dicom:
@@ -77,6 +94,12 @@ class Dicom:
             ib.IonControlPointSequence = pydicom.Sequence(ion_control_points(len(layers)))
             ib.NumberOfControlPoints = 2 * len(layers)
 
+            # Private (300b,100e): modulation width, the range span the layers cover. A
+            # single-layer plan is unmodulated and carries 0.0, as PlanMono.dcm does.
+            ranges = [range_in_water_mm(layer.energy) for layer in layers]
+            ib[0x300b, 0x100e] = pydicom.DataElement(
+                0x300b100e, 'UN', struct.pack('<f', max(ranges) - min(ranges)))
+
             cum_weight = 0.0
             layer_totals: list[float] = []
             for cp_idx, icp in enumerate(ib.IonControlPointSequence):
@@ -97,6 +120,10 @@ class Dicom:
                     icp.IsocenterPosition = [0.0, 0.0, 0.0]  # assuming iso at origin
 
                 icp.CumulativeMetersetWeight = cum_weight  # cumulative MU delivered before this CP
+
+                # Private (300b,1017): range in water of this layer's energy.
+                icp[0x300b, 0x1017] = pydicom.DataElement(
+                    0x300b1017, 'UN', struct.pack('<f', range_in_water_mm(layer.energy)))
 
                 icp.NumberOfScanSpotPositions = layer.nspots
                 icp.ScanSpotPositionMap = (layer.coords * 10.0).tolist()  # convert to mm
