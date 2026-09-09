@@ -171,8 +171,22 @@ class TestCsvEnergyLayers:
         args = parse_arguments(["csv", str(csv_path)])
         model = get_model_from_args(args)
 
-        with pytest.raises(ValueError, match="numeric x, y, mu and energy"):
+        with pytest.raises(ValueError, match="finite numeric x, y, mu and energy"):
             generate_csv_layers(model)
+
+    def test_non_finite_values_are_rejected(self, tmp_path):
+        # float() parses "nan" and "inf", so they would otherwise reach the plan; NaN also
+        # slips past the descending-energy check, since comparing against it is never True.
+        for cell, column in (("nan", "x"), ("inf", "y"), ("-inf", "mu"), ("nan", "energy")):
+            row = {"x": "0.0", "y": "0.0", "mu": "1.0", "energy": "100.0"}
+            row[column] = cell
+            csv_path = tmp_path / f"spots_{column}_{cell}.csv"
+            csv_path.write_text("x,y,mu,energy\n" + ",".join(row.values()) + "\n")
+            args = parse_arguments(["csv", str(csv_path)])
+            model = get_model_from_args(args)
+
+            with pytest.raises(ValueError, match="finite numeric x, y, mu and energy"):
+                generate_csv_layers(model)
 
     def test_dose_plot_covers_all_layers(self, tmp_path):
         csv_path = tmp_path / "spots.csv"

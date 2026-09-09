@@ -1,5 +1,6 @@
 import csv
 import logging
+import math
 from dataclasses import dataclass
 from typing import Optional
 
@@ -310,6 +311,20 @@ def generate_image_pattern(model: PlanInputModel) -> tuple[np.ndarray, np.ndarra
     return coords, weights
 
 
+def _finite(value: Optional[str]) -> float:
+    """
+    Parse one CSV cell as a finite number.
+
+    float() accepts "nan" and "inf", which would give invalid coordinates, MU or energies
+    and silently break the layer ordering check, since every comparison against NaN is
+    False.
+    """
+    number = float(value)  # type: ignore[arg-type]
+    if not math.isfinite(number):
+        raise ValueError(f"non-finite value {value!r}")
+    return number
+
+
 def _read_csv_spots(path: str) -> tuple[list[float], list[float], list[float], Optional[list[float]]]:
     """
     Read a CSV spot list and return the x, y, mu and (optional) energy columns.
@@ -337,14 +352,14 @@ def _read_csv_spots(path: str) -> tuple[list[float], list[float], list[float], O
         energy_values: list[float] = []
         for row_number, row in enumerate(reader, start=2):
             try:
-                x_values.append(float(row[columns['x']]))
-                y_values.append(float(row[columns['y']]))
-                mu_values.append(float(row[columns['mu']]))
+                x_values.append(_finite(row[columns['x']]))
+                y_values.append(_finite(row[columns['y']]))
+                mu_values.append(_finite(row[columns['mu']]))
                 if has_energy:
-                    energy_values.append(float(row[columns['energy']]))
+                    energy_values.append(_finite(row[columns['energy']]))
             except (TypeError, ValueError) as exc:
                 expected = "x, y, mu and energy" if has_energy else "x, y and mu"
-                raise ValueError(f"CSV row {row_number} must contain numeric {expected} values") from exc
+                raise ValueError(f"CSV row {row_number} must contain finite numeric {expected} values") from exc
 
     if not x_values:
         raise ValueError("CSV file must contain at least one spot")

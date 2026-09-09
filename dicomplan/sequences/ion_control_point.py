@@ -64,13 +64,13 @@ def ion_control_points(n_layers: int = 1) -> pydicom.Sequence:
     weights = icp.ScanSpotMetersetWeights
     cm: float = sum(weights) if isinstance(weights, list) else float(weights)
 
-    new_cummulative_meterset_weight = icp.CumulativeMetersetWeight + cm
-    icps.append(_ion_control_point_next(1, empty=True, cm=new_cummulative_meterset_weight))
+    new_cumulative_meterset_weight = icp.CumulativeMetersetWeight + cm
+    icps.append(_ion_control_point_next(1, empty=True, cm=new_cumulative_meterset_weight))
 
     # Remaining layers: a weighted control point followed by its zero-weight terminator.
     # apply_model() overwrites the placeholder energies, positions and weights.
     for idx in range(2, 2 * n_layers):
-        icps.append(_ion_control_point_next(idx, empty=bool(idx % 2), cm=new_cummulative_meterset_weight))
+        icps.append(_ion_control_point_next(idx, empty=bool(idx % 2), cm=new_cumulative_meterset_weight))
 
     return icps
 
